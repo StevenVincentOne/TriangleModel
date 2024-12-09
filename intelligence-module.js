@@ -252,39 +252,37 @@ class IntelligenceModule {
         this.updateDashboard();
         
         console.log('IntelligenceModule initialized with in-memory storage');
+
+        // Add Zero Data button listener
+        const zeroDataButton = document.getElementById('zeroDataButton');
+        if (zeroDataButton) {
+            zeroDataButton.addEventListener('click', () => {
+                console.log('Zero Data button clicked');
+                this.resetSystem();
+            });
+        } else {
+            console.error('Zero Data button not found');
+        }
     }
 
     generateInitialDataset() {
-        console.log('Generating initial dataset...');
+        console.log('Initializing clean system state...');
         
-        const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-        let letterCount = 0;
-        
-        while (letterCount < 12990) {
-            const letter = alphabet[Math.floor(Math.random() * alphabet.length)];
-            
-            for (let i = 0; i < 3; i++) {
-                this.dataStorage.letters.push({
-                    value: letter,
-                    timestamp: Date.now(),
-                    processed: true,
-                    position: letterCount + i
-                });
-            }
-            
-            this.words.push(letter.repeat(3));
-            letterCount += 3;
-        }
+        // Initialize with empty arrays
+        this.dataStorage.letters = [];
+        this.words = [];
 
-        // Update counts in entropyState
-        this.entropyState.totalLetters = 12990;
-        this.entropyState.totalWords = 4330;
-        this.entropyState.currentRatio = this.entropyState.totalWords / this.entropyState.totalLetters;
+        // Initialize counts at zero
+        this.entropyState = {
+            totalLetters: 0,
+            totalWords: 0,
+            totalEntropy: 0,
+            currentRatio: 0
+        };
         
-        console.log('Initial dataset generated:', {
+        console.log('System initialized with clean state:', {
             letters: this.dataStorage.letters.length,
             words: this.words.length,
-            sampleWords: this.words.slice(0, 5),
             totalLetters: this.entropyState.totalLetters,
             totalWords: this.entropyState.totalWords,
             ratio: this.entropyState.currentRatio
@@ -504,7 +502,7 @@ class IntelligenceModule {
         this.loggingState.wordsFormedSinceLastLog = 0;
         this.loggingState.lastRatio = this.entropyState.currentRatio;
     }
-
+    
     resetSystem() {
         // Reset all counters and storage
         this.dataStorage.letters = [];
@@ -519,7 +517,7 @@ class IntelligenceModule {
                 carryOverFromLastInterval: 0
             }
         };
-
+    
         this.entropyState.totalLetters = 0;
         this.entropyState.totalWords = 0;
         this.entropyState.currentRatio = 0;
@@ -534,13 +532,13 @@ class IntelligenceModule {
             lastRatio: 0,
             logInterval: 300
         };
-
+    
         // Reset entropy tracking
         this.entropyState.totalEntropy = 0;
         this.entropyTracking.processedToEntropy = 0;
         this.entropyTracking.currentLossRate = 0;
         this.entropyTracking.greekLetters = [];
-
+    
         // Update dashboard
         this.updateDashboard();
         
