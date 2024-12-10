@@ -2950,7 +2950,6 @@ class TriangleSystem {
         return Math.sqrt((point2.x - point1.x) ** 2 + (point2.y - point1.y) ** 2);
     }
 
-    // Placeholder methods for drawAngles and drawEdgeLengths
     // Implement these based on your specific requirements
     drawAngles(ctx) {
         const angles = this.calculateAngles();
@@ -5603,15 +5602,20 @@ class TriangleSystem {
 
             const elapsed = currentTime - startTime;
             let progress = (elapsed % duration) / duration;
+            const loopCheckbox = document.getElementById('animation-loop');
+            const isLooping = loopCheckbox?.checked;
 
-            if (forward && elapsed >= duration) {
-                forward = false;
-                startTime = currentTime;
-                progress = 1;
-            } else if (!forward && elapsed >= duration) {
-                forward = true;
-                startTime = currentTime;
-                progress = 0;
+            // Handle single play vs loop
+            if (!isLooping && elapsed >= duration) {
+                // For single play, stop at end state
+                this.updateTriangleFromEdges(endState.nc1, endState.nc2, endState.nc3);
+                this.isAnimating = false;
+                return;
+            } else if (isLooping && elapsed >= duration) {
+                // For loop, reverse direction and reset start time
+                forward = !forward; // Simplified direction toggle
+                startTime = currentTime; // Reset start time for next loop
+                progress = 0; // Reset progress
             }
 
             const effectiveProgress = forward ? progress : 1 - progress;
@@ -5625,7 +5629,7 @@ class TriangleSystem {
 
             // Update triangle
             this.updateTriangleFromEdges(current.nc1, current.nc2, current.nc3);
-
+            
             // Continue loop
             this.animationLoop = requestAnimationFrame(animate);
         };
@@ -6824,55 +6828,132 @@ function getColumnLetter(columnNumber) {
 class RulesModule {
     constructor(canvas) {
         this.triangleSystem = new TriangleSystem(canvas);
-        console.log('RulesModule initialized');
-    }
+        console.log('RulesModule initialized with triangle system:', this.triangleSystem);
 
-    getSystemState() {
-        console.log('Getting system state from RulesModule');
-        return {
-            triangleSystem: this.triangleSystem
+        // Initialize batch tracking
+        this.batchTracking = {
+            processedCount: 0,
+            logInterval: 300,
+            channelUpdates: {
+                NC1: { totalDelta: 0, updates: 0 },
+                NC2: { totalDelta: 0, updates: 0 },
+                NC3: { totalDelta: 0, updates: 0 }
+            },
+            startTime: Date.now(),
+            lastLogTime: Date.now()
         };
+
+        // Track our own channel values
+        this.channelValues = {
+            NC1: this.triangleSystem.system.nc1,
+            NC2: this.triangleSystem.system.nc2,
+            NC3: this.triangleSystem.system.nc3
+        };
+
+        // Listen for intelligence updates
+        document.addEventListener('intelligence-update', (event) => {
+            console.log('Received intelligence update:', event.detail);
+            const { channel, delta } = event.detail;
+            this.updateChannelLength(channel, delta);
+        });
+    }
+    
+    updateChannelLength(channel, delta) {
+        try {
+            // Get current NC values from the triangle's actual state
+            const currentValues = {
+                nc1: Number(document.getElementById('channel-1').value) || 300,
+                nc2: Number(document.getElementById('channel-2').value) || 300,
+                nc3: Number(document.getElementById('channel-3').value) || 300
+            };
+    
+            console.log('Current channel values:', currentValues);
+    
+            // Update the appropriate channel
+            switch(channel) {
+                case 'NC1':
+                    currentValues.nc1 = Math.max(1, currentValues.nc1 + Number(delta));
+                    break;
+                case 'NC2':
+                    currentValues.nc2 = Math.max(1, currentValues.nc2 + Number(delta));
+                    break;
+                case 'NC3':
+                    currentValues.nc3 = Math.max(1, currentValues.nc3 + Number(delta));
+                    break;
+            }
+    
+            console.log('Updating triangle with new values:', currentValues, 
+                '\nChannel:', channel, 
+                '\nDelta:', delta,
+                '\nChange:', {
+                    from: document.getElementById(this.getChannelInputId(channel)).value,
+                    to: currentValues[channel.toLowerCase()]
+                }
+            );
+    
+            // Use the same method that manual inputs use
+            this.triangleSystem.updateTriangleFromEdges(
+                currentValues.nc1,
+                currentValues.nc2,
+                currentValues.nc3
+            );
+    
+            // Update our tracked values
+            this.channelValues = currentValues;
+    
+        } catch (error) {
+            console.error('Error updating triangle:', error, {
+                channel,
+                delta,
+                currentSystem: this.triangleSystem.system
+            });
+        }
     }
 
-    updateState(newState) {
-        console.log('Updating system state through RulesModule', newState);
-        if (newState.angles) {
-            // Convert angles to NC values
-            const nc1 = this.angleToNC(newState.angles[0]);
-            const nc2 = this.angleToNC(newState.angles[1]);
-            const nc3 = this.angleToNC(newState.angles[2]);
-            
-            // Update triangle through NC values
-            this.triangleSystem.updateNodeChannels(nc1, nc2, nc3);
-        }
+    logBatchReport(currentValues) {
+        const timeElapsed = (Date.now() - this.batchTracking.lastLogTime) / 1000;
         
-        if (newState.systemStatus) {
-            console.log('System Status:', newState.systemStatus);
-            // Handle system status changes if needed
+        console.log('Triangle NC Update Report:', {
+            updatesProcessed: this.batchTracking.processedCount,
+            timeElapsed: `${timeElapsed.toFixed(2)}s`,
+            updatesPerSecond: (this.batchTracking.processedCount / timeElapsed).toFixed(2),
+            channelUpdates: {
+                NC1: {
+                    totalDelta: this.batchTracking.channelUpdates.NC1.totalDelta,
+                    updateCount: this.batchTracking.channelUpdates.NC1.updates,
+                    currentValue: currentValues.nc1
+                },
+                NC2: {
+                    totalDelta: this.batchTracking.channelUpdates.NC2.totalDelta,
+                    updateCount: this.batchTracking.channelUpdates.NC2.updates,
+                    currentValue: currentValues.nc2
+                },
+                NC3: {
+                    totalDelta: this.batchTracking.channelUpdates.NC3.totalDelta,
+                    updateCount: this.batchTracking.channelUpdates.NC3.updates,
+                    currentValue: currentValues.nc3
+                }
+            }
+        });
+    }
+
+    resetBatchTracking() {
+        this.batchTracking.processedCount = 0;
+        this.batchTracking.channelUpdates = {
+            NC1: { totalDelta: 0, updates: 0 },
+            NC2: { totalDelta: 0, updates: 0 },
+            NC3: { totalDelta: 0, updates: 0 }
+        };
+        this.batchTracking.lastLogTime = Date.now();
+    }
+
+    getChannelInputId(channel) {
+        switch(channel) {
+            case 'NC1': return 'channel-1';
+            case 'NC2': return 'channel-2';
+            case 'NC3': return 'channel-3';
+            default: return null;
         }
-    }
-
-    // Helper method to convert angle to NC value
-    angleToNC(angle) {
-        // Scale angle to NC range (0-600)
-        return Math.round((angle / 180) * 600);
-    }
-
-    calculateArea() {
-        // Get the current triangle area
-        return this.triangleSystem.getArea();
-    }
-
-    validateUpdates(updates) {
-        if (updates.angles) {
-            // Check triangle inequality
-            const sum = updates.angles.reduce((a, b) => a + b, 0);
-            if (Math.abs(sum - 180) > 0.001) return false;
-            
-            // Check angle bounds
-            if (updates.angles.some(angle => angle <= 0 || angle >= 180)) return false;
-        }
-        return true;
     }
 }
 

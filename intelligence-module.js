@@ -78,17 +78,10 @@ class LossFunction {
 
 class NodeChannelEntropy {
     constructor() {
-        // Initialize base channel lengths
-        this.channelLengths = {
-            NC1: 100,  // Initial length units
-            NC2: 100,
-            NC3: 100
-        };
-
         // Bit (English) to Entropy (Greek) mapping with channel assignments
         this.bitToEntropyMapping = {
             // NC1 Channel Letters (9 letters)
-            'A': { bit: 'A', entropy: 'α', channel: 'NC1' },  // -1 length as bit, +1 as entropy
+            'A': { bit: 'A', entropy: 'α', channel: 'NC1' },  // Will send -1 as bit, +1 as entropy
             'D': { bit: 'D', entropy: 'δ', channel: 'NC1' },
             'G': { bit: 'G', entropy: 'γ', channel: 'NC1' },
             'J': { bit: 'J', entropy: 'ξ', channel: 'NC1' },
@@ -121,12 +114,47 @@ class NodeChannelEntropy {
             '∅': { bit: '∅', entropy: 'θ', channel: 'NC3' }
         };
 
-        // Track channel states
+        // Enhanced tracking for batch logging
+        this.batchTracking = {
+            processedCount: 0,
+            logInterval: 300,
+            channelDeltas: {
+                NC1: 0,
+                NC2: 0,
+                NC3: 0
+            },
+            symbolCounts: {},
+            lastLogTime: Date.now()
+        };
+
+        // Track channel states for monitoring only
         this.channelStates = {
             NC1: { bits: 0, entropy: 0 },
             NC2: { bits: 0, entropy: 0 },
             NC3: { bits: 0, entropy: 0 }
         };
+
+        // Add intelligence state
+        this.intelligenceEnabled = false;
+
+        // Add intelligence toggle listener
+        const intelligenceToggle = document.getElementById('intelligenceToggle');
+        if (intelligenceToggle) {
+            intelligenceToggle.addEventListener('click', (e) => {
+                this.intelligenceEnabled = !this.intelligenceEnabled;
+                
+                // Toggle button appearance
+                if (this.intelligenceEnabled) {
+                    e.target.classList.remove('btn-secondary');
+                    e.target.classList.add('btn-success');
+                } else {
+                    e.target.classList.remove('btn-success');
+                    e.target.classList.add('btn-secondary');
+                }
+                
+                console.log('Intelligence mode:', this.intelligenceEnabled ? 'enabled' : 'disabled');
+            });
+        }
     }
 
     processLetter(letter, lossFunction) {
@@ -135,42 +163,87 @@ class NodeChannelEntropy {
 
         const result = lossFunction.processDataLoss(letter);
         const channel = mapping.channel;
+        const delta = result.entropy ? +1 : -1;
 
-        if (result.entropy) {
-            // Letter becomes Entropy (E) - Increase channel length by 1
-            this.channelStates[channel].entropy++;
-            this.channelLengths[channel] += 1;
-            return {
-                type: 'entropy',
-                value: mapping.entropy,
-                channel: channel,
-                newLength: this.channelLengths[channel]
-            };
-        } else {
-            // Letter remains as Bit (B) - Decrease channel length by 1
-            this.channelStates[channel].bits++;
-            this.channelLengths[channel] = Math.max(this.channelLengths[channel] - 1, 1); // Minimum length of 1
-            return {
-                type: 'bit',
-                value: mapping.bit,
-                channel: channel,
-                newLength: this.channelLengths[channel]
-            };
+        // Update batch tracking
+        this.batchTracking.processedCount++;
+        this.batchTracking.channelDeltas[channel] += delta;
+        this.batchTracking.symbolCounts[letter] = (this.batchTracking.symbolCounts[letter] || 0) + 1;
+
+        // Only dispatch events if intelligence is enabled
+        if (this.intelligenceEnabled) {
+            console.log('Dispatching intelligence update:', {
+                channel,
+                delta,
+                letter,
+                type: result.entropy ? 'entropy' : 'bit'
+            });
+            
+            const event = new CustomEvent('intelligence-update', {
+                detail: {
+                    channel: channel,
+                    delta: delta
+                }
+            });
+            document.dispatchEvent(event);
         }
+
+        // Update channel states
+        if (result.entropy) {
+            this.channelStates[channel].entropy++;
+        } else {
+            this.channelStates[channel].bits++;
+        }
+
+        // Log batch report if interval reached
+        if (this.batchTracking.processedCount >= this.batchTracking.logInterval) {
+            this.logBatchReport();
+            this.resetBatchTracking();
+        }
+
+        return {
+            type: result.entropy ? 'entropy' : 'bit',
+            value: result.entropy ? mapping.entropy : mapping.bit,
+            channel: channel,
+            delta: delta
+        };
     }
 
-    getChannelLength(channel) {
-        return this.channelLengths[channel];
+    logBatchReport() {
+        const timeElapsed = (Date.now() - this.batchTracking.lastLogTime) / 1000;
+        
+        console.log('Channel Update Report:', {
+            symbolsProcessed: this.batchTracking.processedCount,
+            timeElapsed: `${timeElapsed.toFixed(2)}s`,
+            symbolsPerSecond: (this.batchTracking.processedCount / timeElapsed).toFixed(2),
+            channelDeltas: {
+                NC1: this.batchTracking.channelDeltas.NC1,
+                NC2: this.batchTracking.channelDeltas.NC2,
+                NC3: this.batchTracking.channelDeltas.NC3
+            },
+            channelStates: {
+                NC1: { ...this.channelStates.NC1 },
+                NC2: { ...this.channelStates.NC2 },
+                NC3: { ...this.channelStates.NC3 }
+            },
+            symbolBreakdown: this.batchTracking.symbolCounts
+        });
     }
 
-    getAllChannelLengths() {
-        return this.channelLengths;
+    resetBatchTracking() {
+        this.batchTracking.processedCount = 0;
+        this.batchTracking.channelDeltas = {
+            NC1: 0,
+            NC2: 0,
+            NC3: 0
+        };
+        this.batchTracking.symbolCounts = {};
+        this.batchTracking.lastLogTime = Date.now();
     }
 
     getChannelState(channel) {
         return {
-            ...this.channelStates[channel],
-            currentLength: this.channelLengths[channel]
+            ...this.channelStates[channel]
         };
     }
 }
