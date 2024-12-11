@@ -176,13 +176,18 @@
                     <!-- Data Management Section -->
                     <div class="data-controls-section">
                         <button id="saveState" class="btn btn-primary btn-sm w-100 mb-2">Save State</button>
-                        <button id="exportImage" class="btn btn-info btn-sm w-100 mb-2">Export Image</button>
-                        <button id="exportData" class="btn btn-info btn-sm w-100 mb-2">Export Data</button>
-                        <button id="importButton" class="btn btn-info btn-sm w-100">Import Data</button>
+                        <button id="exportImage" class="btn btn-primary btn-sm w-100 mb-2">Export Image</button>
+                        <button id="exportData" class="btn btn-primary btn-sm w-100 mb-2">Export Data</button>
+                        <button id="importButton" class="btn btn-primary btn-sm w-100">Import Data</button>
                         <input type="file" id="importFile" style="display: none;" accept=".csv">
                     </div>
                     
-                    <!-- Other controls will go here -->
+                    <!-- System Controls Section -->
+                    <div class="data-controls-section">
+                        <button id="letterFlowToggle" class="btn btn-primary btn-sm w-100 mb-2">Start Flow</button>
+                        <button id="intelligenceToggle" class="btn btn-primary btn-sm w-100 mb-2">Intelligence</button>
+                        <button id="zeroDataButton" class="btn btn-primary btn-sm w-100">Zero Data</button>
+                    </div>
                 </div>
             </div>
             
@@ -291,11 +296,7 @@
                 </div>
                 
                 <!-- Buttons Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <button id="letterFlowToggle" class="flow-control-btn btn btn-primary">Start Flow</button>
-                    <button id="zeroDataButton" class="flow-control-btn btn btn-secondary">Zero Data</button>
-                    <button id="intelligenceToggle" class="flow-control-btn btn btn-secondary">Intelligence</button>
-                </div>
+                
             </div>
         </div>
 
