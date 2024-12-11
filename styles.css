@@ -27,6 +27,7 @@
     width: 100% !important;
     flex-wrap: wrap;
 }
+
         /* ================
            Layout & Spacing
            ================ */
@@ -103,7 +104,91 @@
         /* ================
            Animation Panel
            ================ */
-        .animation-input {
+        /* Add these new styles */
+.animation-panel {
+    width: fit-content;     /* Allow panel to shrink to content */
+    min-width: min-content; /* Prevent panel from being smaller than content */
+}
+
+.animation-inputs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.5rem;  /* Padding around the entire grid */
+}
+
+.grid-header {
+    text-align: center;
+    color: #fff;
+    font-weight: bold;
+    font-size: 0.9rem;
+    padding: 0.25rem;
+}
+
+.compact-input {
+    width: 8ch !important;     /* Increased from 6ch to 8ch */
+    min-width: 8ch !important; /* Increased from 6ch to 8ch */
+    padding: 0.15rem 0.25rem;  /* Small padding around text */
+    font-size: 0.8rem;
+    text-align: center;
+    height: auto;
+}
+
+.animation-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.controls-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    justify-content: center;  /* Center items in the row */
+}
+
+/* Style the checkbox row */
+.controls-row .form-check-input {
+    margin: 0;  /* Remove default margins */
+}
+
+.controls-row .form-check-label {
+    margin: 0;  /* Remove default margins */
+    padding-left: 0.25rem;  /* Small space after checkbox */
+}
+
+.controls-panel {
+    width: 14ch;     /* Width of 14 characters */
+    min-width: 14ch;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.data-controls-section {
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Keep original button styling */
+.controls-panel .btn-primary {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.controls-panel .btn-primary:hover {
+    background-color: #157347;
+    border-color: #146c43;
+}
+
+/* Update existing styles */
+#canvas-container {
+    flex: 1;
+    margin: 0;
+}
+        
+           .animation-input {
             background-color: #2c2c2c;
             color: #fff;
             border: 1px solid #555;

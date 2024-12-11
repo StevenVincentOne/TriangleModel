@@ -137,30 +137,31 @@
 
             <!-- Canvas and Animation Controls -->
             <div class="d-flex align-items-start gap-2">
-                <!-- Left Animation Panel (Start) with Export Buttons -->
-                <div class="animation-panel-start bg-dark p-2 rounded">
-                    <label class="mb-2">Animation Start</label>
-                    <div class="d-flex flex-column gap-2">
-                        <div class="manual-input-group">
-                            <label for="animation-nc1-start">NC1</label>
-                            <input id="animation-nc1-start" type="text" class="form-control manual-input" maxlength="6">
-                        </div>
-                        <div class="manual-input-group">
-                            <label for="animation-nc2-start">NC2</label>
-                            <input id="animation-nc2-start" type="text" class="form-control manual-input" maxlength="6">
-                        </div>
-                        <div class="manual-input-group">
-                            <label for="animation-nc3-start">NC3</label>
-                            <input id="animation-nc3-start" type="text" class="form-control manual-input" maxlength="6">
-                        </div>
+                <!-- Left Animation Panel -->
+                <div class="animation-panel bg-dark p-2 rounded">
+                    <div class="animation-inputs-grid">
+                        <div class="grid-header">Start</div>
+                        <div class="grid-header">End</div>
                         
-                        <!-- Export buttons moved here and stacked vertically -->
-                        <div class="export-container d-flex flex-column gap-2 mt-3">
-                            <button id="saveState" class="btn btn-primary">Save State</button>
-                            <button id="exportImage" class="btn btn-info">Export Image</button>
-                            <button id="exportData" class="btn btn-info">Export Data</button>
-                            <button id="importButton" class="btn btn-info">Import Data</button><!-- Hidden File Input -->
-                            <input type="file" id="importFile" style="display: none;" accept=".csv">
+                        <input id="animation-nc1-start" type="text" class="form-control compact-input" maxlength="6">
+                        <input id="animation-nc1-end" type="text" class="form-control compact-input" maxlength="6">
+                        
+                        <input id="animation-nc2-start" type="text" class="form-control compact-input" maxlength="6">
+                        <input id="animation-nc2-end" type="text" class="form-control compact-input" maxlength="6">
+                        
+                        <input id="animation-nc3-start" type="text" class="form-control compact-input" maxlength="6">
+                        <input id="animation-nc3-end" type="text" class="form-control compact-input" maxlength="6">
+                    </div>
+                    
+                    <!-- Animation Controls -->
+                    <div class="animation-controls mt-2">
+                        <div class="controls-row">
+                            <button id="animate-button-end" class="btn btn-info btn-sm">Animate</button>
+                            <button id="save-animation-end" class="btn btn-info btn-sm">Save</button>
+                        </div>
+                        <div class="controls-row">
+                            <input type="checkbox" id="animation-loop" class="form-check-input">
+                            <label for="animation-loop" class="form-check-label">Loop</label>
                         </div>
                     </div>
                 </div>
@@ -170,31 +171,18 @@
                     <canvas id="canvas"></canvas>
                 </div>
 
-                <!-- Right Animation Panel (End) -->
-                <div class="animation-panel-end bg-dark p-2 rounded">
-                    <label class="mb-2">Animation End</label>
-                    <div class="d-flex flex-column gap-2">
-                        <div class="manual-input-group">
-                            <label for="animation-nc1-end">NC1</label>
-                            <input id="animation-nc1-end" type="text" class="form-control manual-input" maxlength="6">
-                        </div>
-                        <div class="manual-input-group">
-                            <label for="animation-nc2-end">NC2</label>
-                            <input id="animation-nc2-end" type="text" class="form-control manual-input" maxlength="6">
-                        </div>
-                        <div class="manual-input-group">
-                            <label for="animation-nc3-end">NC3</label>
-                            <input id="animation-nc3-end" type="text" class="form-control manual-input" maxlength="6">
-                        </div>
-                        <!-- Add new animation buttons -->
-                        <div class="d-flex flex-column gap-2 mt-2">
-                            <button id="animate-button-end" class="btn btn-info btn-sm">Animate</button>
-                            <input type="checkbox" id="animation-loop" name="animation-loop">
-                                <label for="animation-loop">Loop</label>
-                            </div>
-                            <button id="save-animation-end" class="btn btn-info btn-sm">Save</button>
-                        </div>
+                <!-- Right Controls Panel -->
+                <div class="controls-panel bg-dark p-2 rounded">
+                    <!-- Data Management Section -->
+                    <div class="data-controls-section">
+                        <button id="saveState" class="btn btn-primary btn-sm w-100 mb-2">Save State</button>
+                        <button id="exportImage" class="btn btn-info btn-sm w-100 mb-2">Export Image</button>
+                        <button id="exportData" class="btn btn-info btn-sm w-100 mb-2">Export Data</button>
+                        <button id="importButton" class="btn btn-info btn-sm w-100">Import Data</button>
+                        <input type="file" id="importFile" style="display: none;" accept=".csv">
                     </div>
+                    
+                    <!-- Other controls will go here -->
                 </div>
             </div>
             
@@ -239,7 +227,79 @@
 
         <!-- Dashboard container -->
         <div class="dashboard-container">
-                <!-- System Panel -->
+            <!-- After the System Entropy and Capacity Panel -->
+        <div class="dashboard-panel data-info-panel">
+            
+            <h3 class="panel-header">System Intelligence</h3>
+            <div class="panel-content">
+                <!-- Data Values Row -->
+                <div class="panel-row" style="justify-content: center;">
+                    <div class="label-value-pair">
+                        <label>Data (D)</label>
+                        <input id="system-d" type="text" readonly>
+                    </div>
+                    <div class="label-value-pair">
+                        <label>Bits (B)</label>
+                        <input id="system-b" type="text" readonly>
+                    </div>
+                    <div class="label-value-pair">
+                        <label>Entropy (E)</label>
+                        <input id="system-e" type="text" readonly>
+                    </div>
+                </div>
+                
+                <!-- Ratios Row -->
+                <div class="panel-row" style="justify-content: center;">
+                    <div class="label-value-pair">
+                        <label>B/D</label>
+                        <input id="system-bd-ratio" type="text" readonly>
+                    </div>
+                    <div class="label-value-pair">
+                        <label>E/D</label>
+                        <input id="system-ed-ratio" type="text" readonly>
+                    </div>
+                    <div class="label-value-pair">
+                        <label>B/E</label>
+                        <input id="system-be-ratio" type="text" readonly>
+                    </div>
+                    <div class="label-value-pair">
+                        <label>(E+D)/B</label>
+                        <input id="system-edb-ratio" type="text" readonly>
+                    </div>
+                </div>
+                
+                <!-- Controls Row -->
+                <div class="panel-row" style="justify-content: center;">
+                    <div class="label-value-pair">
+                        <label>Loss Input (LI) %</label>
+                        <input 
+                            id="loss-input-factor" 
+                            type="number" 
+                            min="0" 
+                            max="100" 
+                            step="0.0001" 
+                            class="form-control"
+                        >
+                    </div>
+                    <div class="flow-control">
+                        <label>Flow Rate (letters/sec)</label>
+                        <div class="flow-rate-controls">
+                            <input type="range" id="flowRateSlider" min="0" max="1000" value="100">
+                            <input type="number" id="flowRateValue" min="0" max="1000" value="100">
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Buttons Row -->
+                <div class="panel-row" style="justify-content: center;">
+                    <button id="letterFlowToggle" class="flow-control-btn btn btn-primary">Start Flow</button>
+                    <button id="zeroDataButton" class="flow-control-btn btn btn-secondary">Zero Data</button>
+                    <button id="intelligenceToggle" class="flow-control-btn btn btn-secondary">Intelligence</button>
+                </div>
+            </div>
+        </div>
+
+            <!-- System Panel -->
                 <div class="dashboard-panel">
                     <h3 class="panel-header">System</h3>
                     <div class="panel-row">  <!-- Changed to panel-row for horizontal alignment -->
@@ -489,77 +549,6 @@
             </div>
         </div>
     </div>
-        
-        <!-- After the System Entropy and Capacity Panel -->
-        <div class="dashboard-panel data-info-panel">
-            <h3 class="panel-header">System Data and Information</h3>
-            <div class="panel-content">
-                <!-- Data Values Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <div class="label-value-pair">
-                        <label>Data (D)</label>
-                        <input id="system-d" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>Bits (B)</label>
-                        <input id="system-b" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>Entropy (E)</label>
-                        <input id="system-e" type="text" readonly>
-                    </div>
-                </div>
-                
-                <!-- Ratios Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <div class="label-value-pair">
-                        <label>B/D</label>
-                        <input id="system-bd-ratio" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>E/D</label>
-                        <input id="system-ed-ratio" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>B/E</label>
-                        <input id="system-be-ratio" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>(E+D)/B</label>
-                        <input id="system-edb-ratio" type="text" readonly>
-                    </div>
-                </div>
-                
-                <!-- Controls Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <div class="label-value-pair">
-                        <label>Loss Input (LI) %</label>
-                        <input 
-                            id="loss-input-factor" 
-                            type="number" 
-                            min="0" 
-                            max="100" 
-                            step="0.0001" 
-                            class="form-control"
-                        >
-                    </div>
-                    <div class="flow-control">
-                        <label>Flow Rate (letters/sec)</label>
-                        <div class="flow-rate-controls">
-                            <input type="range" id="flowRateSlider" min="0" max="1000" value="100">
-                            <input type="number" id="flowRateValue" min="0" max="1000" value="100">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Buttons Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <button id="letterFlowToggle" class="flow-control-btn btn btn-primary">Start Flow</button>
-                    <button id="zeroDataButton" class="flow-control-btn btn btn-secondary">Zero Data</button>
-                    <button id="intelligenceToggle" class="flow-control-btn btn btn-secondary">Intelligence</button>
-                </div>
-            </div>
-        </div>
 
         <!-- Subsystems Panel -->
         <div class="dashboard-panel">
