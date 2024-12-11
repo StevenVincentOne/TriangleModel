@@ -1,32 +1,47 @@
 // Add this before the TriangleSystem class definition
 class TriangleDatabase {
     constructor() {
+        this.initialized = false;
+        this.tokenClient = null;
+        this.accessToken = null;
+        
+        // Keep your existing configuration constants
         this.API_KEY = 'AIzaSyCQh02aAcYmvvGJVVJFwRFOQ5Ptvug8dOQ';
         this.CLIENT_ID = '66954381705-rib6tkc4qse6rdue4id2e1svmb6otm24.apps.googleusercontent.com';
         this.SPREADSHEET_ID = '1LN0wA4gUY0XFdY_v8SlHvwMeu1A4_X8t56FF2mP1l40';
         this.SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
-        this.tokenClient = null;
-        this.accessToken = null;
-        this.initialized = false;
+        this.DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
     }
 
     async init() {
         try {
+            // Wait for both Google API libraries to load
+            await new Promise((resolve, reject) => {
+                const checkGAPILoaded = () => {
+                    if (window.gapi && window.google) {
+                        resolve();
+                    } else {
+                        setTimeout(checkGAPILoaded, 100);
+                    }
+                };
+                checkGAPILoaded();
+            });
+
+            // Initialize the tokenClient
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: this.CLIENT_ID,
+                scope: this.SCOPES,
+                callback: '', // We'll handle this in getAccessToken
+            });
+
+            // Initialize gapi client
             await new Promise((resolve, reject) => {
                 gapi.load('client', async () => {
                     try {
                         await gapi.client.init({
                             apiKey: this.API_KEY,
-                            discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
+                            discoveryDocs: [this.DISCOVERY_DOC],
                         });
-
-                        // Initialize the tokenClient
-                        this.tokenClient = google.accounts.oauth2.initTokenClient({
-                            client_id: this.CLIENT_ID,
-                            scope: this.SCOPES,
-                            callback: '', // Will be set later
-                        });
-
                         this.initialized = true;
                         resolve();
                     } catch (error) {
