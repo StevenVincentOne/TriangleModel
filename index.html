@@ -164,6 +164,34 @@
                             <label for="animation-loop" class="form-check-label">Loop</label>
                         </div>
                     </div>
+
+                    <!-- System Intelligence Inputs -->
+                    <div class="system-intelligence-inputs mt-3">
+                        <div class="input-row">
+                            <label for="system-d">Data</label>
+                            <input type="text" id="system-d" readonly>
+                        </div>
+                        <div class="input-row">
+                            <label for="system-b">Bits</label>
+                            <input type="text" id="system-b" readonly>
+                        </div>
+                        <div class="input-row">
+                            <label for="system-e">Entropy</label>
+                            <input type="text" id="system-e" readonly>
+                        </div>
+                        <div class="input-row">
+                            <label for="system-be-ratio">B/E</label>
+                            <input type="text" id="system-be-ratio" readonly>
+                        </div>
+                        <div class="input-row">
+                            <label for="flow-rate">Flow</label>
+                            <input type="number" id="flow-rate" min="1" max="100" value="10">
+                        </div>
+                        <div class="input-row">
+                            <label for="loss-rate">Loss %</label>
+                            <input type="number" id="loss-rate" min="0" max="100" value="5">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Canvas (Center) -->
@@ -232,73 +260,7 @@
 
         <!-- Dashboard container -->
         <div class="dashboard-container">
-            <!-- After the System Entropy and Capacity Panel -->
-        <div class="dashboard-panel data-info-panel">
             
-            <h3 class="panel-header">System Intelligence</h3>
-            <div class="panel-content">
-                <!-- Data Values Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <div class="label-value-pair">
-                        <label>Data (D)</label>
-                        <input id="system-d" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>Bits (B)</label>
-                        <input id="system-b" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>Entropy (E)</label>
-                        <input id="system-e" type="text" readonly>
-                    </div>
-                </div>
-                
-                <!-- Ratios Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <div class="label-value-pair">
-                        <label>B/D</label>
-                        <input id="system-bd-ratio" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>E/D</label>
-                        <input id="system-ed-ratio" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>B/E</label>
-                        <input id="system-be-ratio" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>(E+D)/B</label>
-                        <input id="system-edb-ratio" type="text" readonly>
-                    </div>
-                </div>
-                
-                <!-- Controls Row -->
-                <div class="panel-row" style="justify-content: center;">
-                    <div class="label-value-pair">
-                        <label>Loss Input (LI) %</label>
-                        <input 
-                            id="loss-input-factor" 
-                            type="number" 
-                            min="0" 
-                            max="100" 
-                            step="0.0001" 
-                            class="form-control"
-                        >
-                    </div>
-                    <div class="flow-control">
-                        <label>Flow Rate (letters/sec)</label>
-                        <div class="flow-rate-controls">
-                            <input type="range" id="flowRateSlider" min="0" max="1000" value="100">
-                            <input type="number" id="flowRateValue" min="0" max="1000" value="100">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Buttons Row -->
-                
-            </div>
-        </div>
 
             <!-- System Panel -->
                 <div class="dashboard-panel">

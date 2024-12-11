@@ -2058,3 +2058,41 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     border-color: #198754 !important;
     color: #fff !important;
 }
+
+/* System Intelligence inputs in animation panel */
+.system-intelligence-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    align-items: center;  /* Center the rows */
+}
+
+.system-intelligence-inputs .input-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;  /* Center the content */
+    gap: 0.5rem;
+    width: 100%;  /* Full width for proper centering */
+}
+
+.system-intelligence-inputs label {
+    min-width: 5.5ch;  /* Slightly wider to accommodate "Entropy:" */
+    color: #fff;  /* Brighter color to match other labels */
+    font-size: 0.8rem;
+    text-align: right;  /* Align labels to the right */
+}
+
+.system-intelligence-inputs input {
+    width: 8ch !important;
+    min-width: 8ch !important;
+    padding: 0.15rem 0.25rem !important;
+    font-size: 0.8rem !important;
+    text-align: center !important;
+    height: auto !important;
+    background-color: #1e1e1e !important;  /* Match the animation input background */
+    color: #fff !important;
+    border: 1px solid #3a3a3a !important;  /* Match the animation input border */
+    border-radius: 4px !important;
+}
