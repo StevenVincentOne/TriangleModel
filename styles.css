@@ -1922,11 +1922,6 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     margin-left: 20px;
 }
 
-.flow-control input[type="range"] {
-    width: 150px;
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
 .flow-control input[type="number"] {
     width: 70px;
     background-color: rgba(255, 255, 255, 0.1);
@@ -1953,14 +1948,6 @@ input[id*="euler"] {  /* Added Euler Line inputs */
         display: flex;
         gap: 1rem;
         align-items: center;
-    }
-
-.data-info-panel .flow-rate-controls input[type="number"] {
-        width: 80px;
-    }
-
-.data-info-panel .flow-rate-controls input[type="range"] {
-        width: 200px;
     }
 
 .data-info-panel .control-group {
@@ -2095,4 +2082,30 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     color: #fff !important;
     border: 1px solid #3a3a3a !important;  /* Match the animation input border */
     border-radius: 4px !important;
+}
+
+/* Add specific styling for the loss input field */
+#loss-input-factor {
+    width: 8ch !important;
+    min-width: 8ch !important;
+    padding: 0.15rem 0.25rem !important;
+    font-size: 0.8rem !important;
+    text-align: center !important;
+    height: auto !important;
+    background-color: #1e1e1e !important;
+    color: #fff !important;
+    border: 1px solid #3a3a3a !important;
+    border-radius: 4px !important;
+}
+
+#loss-input-factor:focus {
+    outline: none !important;
+    border-color: #198754 !important;
+    box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25) !important;
+}
+
+/* Ensure input doesn't maintain focus styling after blur */
+#loss-input-factor:not(:focus) {
+    border-color: #3a3a3a !important;
+    box-shadow: none !important;
 }

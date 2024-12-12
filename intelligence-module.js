@@ -45,8 +45,8 @@ class LossFunction {
     }
 
     processDataLoss(letter) {
-        // Determine if this letter should become entropy
         const isEntropy = Math.random() < this.lossFactors.inputLoss;
+        console.log('Processing letter:', letter, 'with loss factor:', this.lossFactors.inputLoss, 'Result:', isEntropy ? 'entropy' : 'bit');
         
         if (isEntropy) {
             return {
@@ -70,8 +70,10 @@ class LossFunction {
 
     // Set loss factor (value should be between 0 and 1)
     setLossFactor(value) {
+        console.log('Setting loss factor to:', value);
         if (value >= 0 && value <= 1) {
             this.lossFactors.inputLoss = value;
+            console.log('Loss factor updated to:', this.lossFactors.inputLoss);
         }
     }
 }
@@ -300,20 +302,21 @@ class IntelligenceModule {
         this.lossFunction = new LossFunction();
         this.nodeChannelEntropy = new NodeChannelEntropy();
         
-        // Set initial loss input value in UI
-        const lossInputField = document.getElementById('loss-input-factor');
+        // Set initial loss input value in UI using correct ID
+        const lossInputField = document.getElementById('loss-rate');
+        console.log('Found loss input field:', lossInputField ? 'yes' : 'no');
+        
         if (lossInputField) {
+            console.log('Adding loss factor event listeners');
             lossInputField.value = (this.lossFunction.getLossFactor() * 100).toFixed(4);
             
-            // Add event listener for changes
-            lossInputField.addEventListener('change', (e) => {
+            // Add event listeners for changes
+            lossInputField.addEventListener('input', (e) => {
+                console.log('Loss input event:', e.target.value);
                 const value = parseFloat(e.target.value);
                 if (!isNaN(value) && value >= 0 && value <= 100) {
                     this.lossFunction.setLossFactor(value / 100);
                     console.log('Loss factor updated to:', value, '%');
-                } else {
-                    // Reset to current value if invalid input
-                    e.target.value = (this.lossFunction.getLossFactor() * 100).toFixed(4);
                 }
             });
         }

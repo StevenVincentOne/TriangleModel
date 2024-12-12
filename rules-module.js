@@ -551,17 +551,10 @@ class TriangleSystem {
                 console.log('Save State button clicked');
                 try {
                     // Initialize database first
-                    console.log('Checking database initialization...');
+                    
                     if (!this.db.initialized) {
-                        console.log('Database not initialized, initializing now...');
                         await this.db.init();
                     }
-                    console.log('Database initialization complete');
-
-                    // Get access token
-                    console.log('Getting access token...');
-                    await this.db.getAccessToken();
-                    console.log('Access token obtained successfully');
 
                     // Call saveState with our new explicit mapping approach
                     const result = await this.db.saveState();
@@ -775,8 +768,7 @@ class TriangleSystem {
 
     loadPreset(name, values) {
         try {
-            console.log('Starting preset load:', name);
-            console.log('Input values:', values);
+            
 
             // 1. Validate input values
             if (!values || typeof values !== 'object') {
@@ -799,7 +791,7 @@ class TriangleSystem {
                 }
             };
 
-            console.log('Processed vertices:', vertices);
+            
 
             // 3. Update system vertices
             this.system = {
@@ -859,7 +851,7 @@ class TriangleSystem {
             if (element) {
                 
                 element.addEventListener('click', () => {
-                    console.log(`Toggle ${button.id}: ${!this[button.property]}`); // Add this line
+                    
                     this[button.property] = !this[button.property];
                     console.log(`Euler state: ${this.showEuler}`);  // Add debug log
                     element.classList.toggle('btn-info', this[button.property]);
@@ -904,7 +896,7 @@ class TriangleSystem {
         console.log('Setting up Save button listener');
         const saveButton = document.getElementById('save-preset');
         if (saveButton) {
-            console.log('Save button found');
+            
             saveButton.addEventListener('click', () => {
                 console.log('Save button clicked');
                 this.saveCurrentConfig();
@@ -920,14 +912,13 @@ class TriangleSystem {
         if (presetDropdown && dropdownButton) {
             // Load saved presets from localStorage
             const savedPresets = JSON.parse(localStorage.getItem('userPresets')) || {};
-            console.log('Loaded presets from storage:', savedPresets);
+            
             
             // Clear existing items
             presetDropdown.innerHTML = '';
             
             // Add each preset to the dropdown
             Object.entries(savedPresets).forEach(([name, config]) => {
-                console.log('Adding preset to dropdown:', name, config);
                 const item = document.createElement('li');
                 const link = document.createElement('a');
                 link.className = 'dropdown-item';
@@ -3579,7 +3570,6 @@ class TriangleSystem {
         
         // Add each saved animation to dropdown
         Object.entries(this.userAnimations).forEach(([name, config]) => {
-            console.log('Adding animation:', name);
             const item = document.createElement('li');
             const link = document.createElement('a');
             link.className = 'dropdown-item';
@@ -3602,8 +3592,6 @@ class TriangleSystem {
                 animationsList.classList.remove('show');
             }
         });
-
-        console.log('Animations dropdown initialized');
     }
 
     // Add this method if it doesn't exist, or update it if it does
@@ -3776,8 +3764,6 @@ class TriangleSystem {
         const { n1, n2, n3 } = this.system;
         const EPSILON = 1e-10;
         const roundNearZero = (value) => Math.abs(value) < EPSILON ? 0 : value;
-
-        console.log("Calculating circumcenter for points:", { n1, n2, n3 });
 
         // Calculate the midpoints of sides n1-n2 and n2-n3
         const midAB = this.calculateMidpoint(n1, n2);
@@ -4741,8 +4727,7 @@ class TriangleSystem {
                 'ic-3': icValues['manual-ic3'].toFixed(2)   // Changed from d-ic3
             };
 
-            // Debug log for Dashboard IC Values
-            console.log('Calculated Dashboard IC Values:', dashboardICValues);
+            
 
             Object.entries(dashboardICValues).forEach(([id, value]) => {
                 const input = document.getElementById(id);
@@ -5041,8 +5026,6 @@ class TriangleSystem {
                 }
             };
         }
-
-        console.log('Calculating Euler Line metrics...');
         
         // Check for required points
         if (!this.system?.circumcenter || !this.system?.orthocenter) {
@@ -5365,11 +5348,6 @@ class TriangleSystem {
                 nc3: this.calculateDistance(this.system.n2, this.system.n3)   // NC3: N2-N3
             };
 
-            // Add debug logging
-            console.log('Midpoints:', midpoints);
-            console.log('Tangent Points:', tangentPoints);
-            console.log('NC Lengths:', ncLengths);
-
             // Calculate and update each rNC(M,T) value
             ['1', '2', '3'].forEach((i) => {
                 const dMT = this.calculateDistance(midpoints[`m${i}`], tangentPoints[i - 1]);
@@ -5454,9 +5432,7 @@ class TriangleSystem {
             const centroid = this.calculateCentroid();
             const totalSystemEntropy = this.calculateTotalEntropy();
             
-            // Debug total system entropy
-            console.log('=== Subsystem Table Update ===');
-            console.log('Total System Entropy:', totalSystemEntropy);
+            
             
             for (let i =1; i <= 3; i++) {
                 // Calculate ssh
@@ -5806,11 +5782,7 @@ class TriangleSystem {
             α3: this.calculateDistance(n3, altitudes.α3)
         };
 
-        console.log('Altitude Calculations:', {
-            vertices: { n1, n2, n3 },
-            feet: altitudes,
-            lengths: altitudes.lengths
-        });
+        
 
         return altitudes;
     }
@@ -6095,8 +6067,6 @@ class TriangleSystem {
                 sc3: this.calculateDistance(subtriangleCentroids.ss2, subtriangleCentroids.ss3)  // SS2 to SS3
             };
 
-            console.log('Calculated Subchannel Distances (SC):', subchannelDistances);
-
             // Update subchannel values in the table
             ['1', '2', '3'].forEach(i => {
                 const scValue = subchannelDistances[`sc${i}`];
@@ -6135,11 +6105,11 @@ class TriangleSystem {
         try {
             // Calculate centroid (I)
             const centroid = this.calculateCentroid();
-            console.log('Calculated Centroid:', centroid);
+            
 
             // Get full median lengths for comparison
             const fullMedians = this.calculateFullMedians();
-            console.log('Full Medians:', fullMedians);
+            
             
             // Calculate I-Channels using centroid to node distances
             const iChannels = {
@@ -6147,14 +6117,6 @@ class TriangleSystem {
                 n2: this.calculateDistance(centroid, this.system.n2),
                 n3: this.calculateDistance(centroid, this.system.n3)
             };
-
-            console.log('Node Positions:', {
-                n1: this.system.n1,
-                n2: this.system.n2,
-                n3: this.system.n3
-            });
-            
-            console.log('Calculated I-Channels (IC):', iChannels);
 
             // Update IC inputs in the dashboard
             ['1', '2', '3'].forEach(i => {

@@ -18,6 +18,7 @@ class EnvironmentModule {
         this.initializeControls();
         console.log('EnvironmentModule initialized with weighted letter distribution');
         console.log('Total letter pool size:', this.alphabet.length);
+        console.log('Intelligence module connected:', this.intelligenceModule ? 'yes' : 'no');
 
         // Add zero data button handler
         const zeroDataButton = document.getElementById('zeroDataButton');
@@ -35,8 +36,12 @@ class EnvironmentModule {
 
     initializeControls() {
         const toggleBtn = document.getElementById('letterFlowToggle');
-        const rateSlider = document.getElementById('flowRateSlider');
-        const rateValue = document.getElementById('flowRateValue');
+        const rateValue = document.getElementById('flow-rate');
+
+        console.log('Found elements:', {
+            toggleBtn: toggleBtn ? 'yes' : 'no',
+            rateValue: rateValue ? 'yes' : 'no'
+        });
 
         if (toggleBtn) {
             toggleBtn.addEventListener('click', () => {
@@ -52,27 +57,25 @@ class EnvironmentModule {
             });
         }
 
-        if (rateSlider && rateValue) {
-            // Sync slider and number input
-            rateSlider.addEventListener('input', (e) => {
-                const newRate = parseInt(e.target.value);
-                rateValue.value = newRate;
-                this.updateFlowRate(newRate);
-            });
-
-            rateValue.addEventListener('change', (e) => {
-                const newRate = Math.min(1000, Math.max(0, parseInt(e.target.value)));
-                rateValue.value = newRate;
-                rateSlider.value = newRate;
+        // Add handlers for the flow rate input
+        if (rateValue) {
+            console.log('Adding flow rate event listeners');
+            
+            // Handle direct input changes (including arrow buttons)
+            rateValue.addEventListener('input', (e) => {
+                console.log('Flow rate input event:', e.target.value);
+                const newRate = Math.min(1000, Math.max(0, parseInt(e.target.value) || 0));
+                console.log('Parsed new rate:', newRate);
                 this.updateFlowRate(newRate);
             });
         }
     }
 
     updateFlowRate(newRate) {
+        console.log('Updating flow rate from', this.flowRate, 'to', newRate);
         this.flowRate = newRate;
         if (this.isGenerating) {
-            // Restart generation with new rate
+            console.log('Restarting generation with new rate');
             this.stopLetterGeneration();
             this.startLetterGeneration();
         }
