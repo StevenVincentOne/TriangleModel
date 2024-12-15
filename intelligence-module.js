@@ -1,7 +1,7 @@
 class LossFunction {
     constructor() {
         this.lossFactors = {
-            inputLoss: 0.05  // Default 5%
+            inputLoss: 0.0  // Set to 0 for testing
         };
 
         // English to Greek mapping
@@ -39,28 +39,16 @@ class LossFunction {
         };
     }
 
+    // Determine if a letter results in entropy based on the loss factor
+    processDataLoss(letter) {
+        const isEntropy = Math.random() < this.lossFactors.inputLoss;
+        console.log(`Processing letter: "${letter}" with loss factor: ${(this.lossFactors.inputLoss * 100).toFixed(2)}% Result: ${isEntropy ? 'Entropy (E)' : 'Data (D)'}`);
+        return { entropy: isEntropy, value: isEntropy ? 'E' : 'D' };
+    }
+
     // Convert letter to its Greek equivalent
     convertToGreek(letter) {
         return this.greekConversion[letter] || letter;
-    }
-
-    processDataLoss(letter) {
-        const isEntropy = Math.random() < this.lossFactors.inputLoss;
-        console.log('Processing letter:', letter, 'with loss factor:', this.lossFactors.inputLoss, 'Result:', isEntropy ? 'entropy' : 'bit');
-        
-        if (isEntropy) {
-            return {
-                entropy: true,
-                value: this.convertToGreek(letter),
-                remainingData: 0
-            };
-        }
-        
-        return {
-            entropy: false,
-            value: letter,
-            remainingData: 1
-        };
     }
 
     // Get current loss factor
@@ -68,19 +56,18 @@ class LossFunction {
         return this.lossFactors.inputLoss;
     }
 
-    // Set loss factor (value should be between 0 and 1)
+    // Set new loss factor
     setLossFactor(value) {
-        console.log('Setting loss factor to:', value);
         if (value >= 0 && value <= 1) {
             this.lossFactors.inputLoss = value;
-            console.log('Loss factor updated to:', this.lossFactors.inputLoss);
+            console.log('Loss factor updated to:', `${this.lossFactors.inputLoss * 100}%`);
         }
     }
 }
 
 class NodeChannelEntropy {
-    constructor() {
-        // Bit (English) to Entropy (Greek) mapping with channel assignments
+    constructor(intelligenceModule) {
+        this.intelligenceModule = intelligenceModule;
         this.bitToEntropyMapping = {
             // NC1 Channel Letters (9 letters)
             'A': { bit: 'A', entropy: 'α', channel: 'NC1' },  // Will send -1 as bit, +1 as entropy
@@ -115,516 +102,182 @@ class NodeChannelEntropy {
             'X': { bit: 'X', entropy: 'χ', channel: 'NC3' },
             '∅': { bit: '∅', entropy: 'θ', channel: 'NC3' }
         };
+    }
 
-        // Enhanced tracking for batch logging
-        this.batchTracking = {
-            processedCount: 0,
-            logInterval: 300,
-            channelDeltas: {
-                NC1: 0,
-                NC2: 0,
-                NC3: 0
-            },
-            symbolCounts: {},
-            lastLogTime: Date.now()
+    // Removed processLetter as it's handled by IntelligenceModule
+}
+
+class IntelligenceModule {
+    constructor() {
+        // Private variable to track intelligence state
+        this._intelligenceEnabled = false;
+
+        // Initialize other components
+        this.lossFunction = new LossFunction();
+        this.nodeChannelEntropy = new NodeChannelEntropy(this);
+
+        // Initialize data structures
+        this.letterPool = {
+            groups: {},           // Stores counts of each letter
+            totalUnprocessed: 0   // Total unprocessed letters
         };
-
-        // Track channel states for monitoring only
-        this.channelStates = {
-            NC1: { bits: 0, entropy: 0 },
-            NC2: { bits: 0, entropy: 0 },
-            NC3: { bits: 0, entropy: 0 }
+        this.entropyState = {
+            totalLetters: 0,      // Total Data (D)
+            totalWords: 0,        // Total Bits (B)
+            totalEntropy: 0       // Total Entropy (E)
         };
-
-        // Add intelligence state
-        this.intelligenceEnabled = false;
 
         // Add intelligence toggle listener
         const intelligenceToggle = document.getElementById('intelligenceToggle');
         if (intelligenceToggle) {
-            intelligenceToggle.addEventListener('click', (e) => {
-                this.intelligenceEnabled = !this.intelligenceEnabled;
-                
-                // Toggle button appearance
-                if (this.intelligenceEnabled) {
-                    e.target.classList.remove('btn-secondary');
-                    e.target.classList.add('btn-success');
-                } else {
-                    e.target.classList.remove('btn-success');
-                    e.target.classList.add('btn-secondary');
-                }
-                
-                console.log('Intelligence mode:', this.intelligenceEnabled ? 'enabled' : 'disabled');
+            intelligenceToggle.addEventListener('click', () => {
+                this.toggleIntelligence(intelligenceToggle);
             });
         }
-    }
 
-    processLetter(letter, lossFunction) {
-        const mapping = this.bitToEntropyMapping[letter];
-        if (!mapping) return null;
-
-        const result = lossFunction.processDataLoss(letter);
-        const channel = mapping.channel;
-        const delta = result.entropy ? +1 : -1;
-
-        // Update batch tracking
-        this.batchTracking.processedCount++;
-        this.batchTracking.channelDeltas[channel] += delta;
-        this.batchTracking.symbolCounts[letter] = (this.batchTracking.symbolCounts[letter] || 0) + 1;
-
-        // Only dispatch events if intelligence is enabled
-        if (this.intelligenceEnabled) {
-            console.log('Dispatching intelligence update:', {
-                channel,
-                delta,
-                letter,
-                type: result.entropy ? 'entropy' : 'bit'
-            });
-            
-            const event = new CustomEvent('intelligence-update', {
-                detail: {
-                    channel: channel,
-                    delta: delta
-                }
-            });
-            document.dispatchEvent(event);
-        }
-
-        // Update channel states
-        if (result.entropy) {
-            this.channelStates[channel].entropy++;
-        } else {
-            this.channelStates[channel].bits++;
-        }
-
-        // Log batch report if interval reached
-        if (this.batchTracking.processedCount >= this.batchTracking.logInterval) {
-            this.logBatchReport();
-            this.resetBatchTracking();
-        }
-
-        return {
-            type: result.entropy ? 'entropy' : 'bit',
-            value: result.entropy ? mapping.entropy : mapping.bit,
-            channel: channel,
-            delta: delta
-        };
-    }
-
-    logBatchReport() {
-        const timeElapsed = (Date.now() - this.batchTracking.lastLogTime) / 1000;
-        
-        console.log('Channel Update Report:', {
-            symbolsProcessed: this.batchTracking.processedCount,
-            timeElapsed: `${timeElapsed.toFixed(2)}s`,
-            symbolsPerSecond: (this.batchTracking.processedCount / timeElapsed).toFixed(2),
-            channelDeltas: {
-                NC1: this.batchTracking.channelDeltas.NC1,
-                NC2: this.batchTracking.channelDeltas.NC2,
-                NC3: this.batchTracking.channelDeltas.NC3
-            },
-            channelStates: {
-                NC1: { ...this.channelStates.NC1 },
-                NC2: { ...this.channelStates.NC2 },
-                NC3: { ...this.channelStates.NC3 }
-            },
-            symbolBreakdown: this.batchTracking.symbolCounts
-        });
-    }
-
-    resetBatchTracking() {
-        this.batchTracking.processedCount = 0;
-        this.batchTracking.channelDeltas = {
-            NC1: 0,
-            NC2: 0,
-            NC3: 0
-        };
-        this.batchTracking.symbolCounts = {};
-        this.batchTracking.lastLogTime = Date.now();
-    }
-
-    getChannelState(channel) {
-        return {
-            ...this.channelStates[channel]
-        };
-    }
-}
-
-class IntelligenceModule {
-    constructor(rulesModule) {
-        this.rulesModule = rulesModule;
-        
-        // Initialize arrays and storage
-        this.words = [];          
-        this.letterBuffer = [];   
-        
-        // Initialize data storage with system capacity
-        this.dataStorage = {
-            letters: [],           
-            processedLetters: 0,   
-            maxCapacity: parseFloat(document.querySelector('#system-c')?.value) || 38971,
-            bufferSize: 1000,      
-        };
-
-        this.entropyState = {
-            totalLetters: 0,       
-            totalWords: 0,         
-            totalEntropy: 0,       
-            currentRatio: 0
-        };
-
-        // Initialize entropy tracking
-        this.entropyTracking = {
-            processedToEntropy: 0,
-            currentLossRate: 0,
-            greekLetters: []
-        };
-
-        this.letterPool = {
-            groups: {},
-            totalUnprocessed: 0,
-            letterHistory: {
-                added: 0,
-                processed: 0,
-                carryOverFromLastInterval: 0
-            }
-        };
-
-        // Add tracking for logging
-        this.loggingState = {
-            lettersSinceLastLog: 0,
-            wordsFormedSinceLastLog: 0,
-            lastRatio: 0,
-            logInterval: 300
-        };
-
-        // Initialize loss function and node channel entropy
-        this.lossFunction = new LossFunction();
-        this.nodeChannelEntropy = new NodeChannelEntropy();
-        
-        // Set initial loss input value in UI using correct ID
+        // Initialize loss rate input
         const lossInputField = document.getElementById('loss-rate');
-        console.log('Found loss input field:', lossInputField ? 'yes' : 'no');
-        
         if (lossInputField) {
-            console.log('Adding loss factor event listeners');
             lossInputField.value = (this.lossFunction.getLossFactor() * 100).toFixed(4);
-            
-            // Add event listeners for changes
             lossInputField.addEventListener('input', (e) => {
-                console.log('Loss input event:', e.target.value);
                 const value = parseFloat(e.target.value);
                 if (!isNaN(value) && value >= 0 && value <= 100) {
                     this.lossFunction.setLossFactor(value / 100);
-                    console.log('Loss factor updated to:', value, '%');
+                    console.log(`Loss factor updated to: ${value} %`);
                 }
             });
         }
 
-        // Generate initial dataset
+        // Initialize clean system state
         this.generateInitialDataset();
-        
-        // Explicitly update dashboard after initialization
         this.updateDashboard();
-        
-        console.log('IntelligenceModule initialized with in-memory storage');
+    }
 
-        // Add Zero Data button listener
-        const zeroDataButton = document.getElementById('zeroDataButton');
-        if (zeroDataButton) {
-            zeroDataButton.addEventListener('click', () => {
-                console.log('Zero Data button clicked');
-                this.resetSystem();
-            });
+    // Getter for intelligenceEnabled
+    get intelligenceEnabled() {
+        return this._intelligenceEnabled;
+    }
+
+    // Setter for intelligenceEnabled
+    set intelligenceEnabled(value) {
+        this._intelligenceEnabled = value;
+        console.log('Intelligence state set to:', value);
+    }
+
+    // Toggle Intelligence Mode
+    toggleIntelligence(button) {
+        this.intelligenceEnabled = !this.intelligenceEnabled;
+
+        if (this.intelligenceEnabled) {
+            button.classList.add('active');
+            button.querySelector('.status-icon-off').style.display = 'none';
+            button.querySelector('.status-icon-on').style.display = 'inline';
+            console.log('Intelligence mode: enabled');
         } else {
-            console.error('Zero Data button not found');
+            button.classList.remove('active');
+            button.querySelector('.status-icon-on').style.display = 'none';
+            button.querySelector('.status-icon-off').style.display = 'inline';
+            console.log('Intelligence mode: disabled');
         }
     }
 
-    generateInitialDataset() {
-        console.log('Initializing clean system state...');
-        
-        // Initialize with empty arrays
-        this.dataStorage.letters = [];
-        this.words = [];
+    // Process Incoming Letter
+    processLetter(letter) {
+        console.log(`Processing letter: "${letter}"`);
 
-        // Initialize counts at zero
-        this.entropyState = {
-            totalLetters: 0,
-            totalWords: 0,
-            totalEntropy: 0,
-            currentRatio: 0
-        };
-        
-        console.log('System initialized with clean state:', {
-            letters: this.dataStorage.letters.length,
-            words: this.words.length,
-            totalLetters: this.entropyState.totalLetters,
-            totalWords: this.entropyState.totalWords,
-            ratio: this.entropyState.currentRatio
-        });
+        // Process through loss function to determine if it's entropy
+        const result = this.lossFunction.processDataLoss(letter);
+        console.log(`Result of loss function: ${result.entropy ? 'Entropy (E)' : 'Data (D)'}`);
+
+        if (result.entropy) {
+            // Handle entropy case
+            this.entropyState.totalEntropy++;
+            console.log(`Entropy incremented to: ${this.entropyState.totalEntropy}`);
+
+            // Dispatch entropy update
+            const mapping = this.nodeChannelEntropy.bitToEntropyMapping[letter];
+            if (mapping && this.intelligenceEnabled) {
+                this.dispatchIntelligenceUpdate(mapping.channel, +1, 'entropy');
+            }
+
+        } else {
+            // Not entropy - add to Data pool
+            this.addToDataPool(letter);
+        }
+
+        this.updateDashboard();
     }
 
-    updateLetterPool(letter, isAdding = true) {
-        if (isAdding) {
-            this.letterPool.groups[letter] = (this.letterPool.groups[letter] || 0) + 1;
-            this.letterPool.totalUnprocessed++;
-            this.letterPool.letterHistory.added++;
-        } else {
+    // Add Letter to Data Pool
+    addToDataPool(letter) {
+        // Initialize group if it doesn't exist
+        if (!this.letterPool.groups[letter]) {
+            this.letterPool.groups[letter] = 0;
+        }
+
+        // Add letter to its group
+        this.letterPool.groups[letter]++;
+        this.letterPool.totalUnprocessed++;
+        this.entropyState.totalLetters++;
+        console.log(`Added to Data pool: { letter: "${letter}", count: ${this.letterPool.groups[letter]}, totalLetters: ${this.entropyState.totalLetters}, totalUnprocessed: ${this.letterPool.totalUnprocessed} }`);
+
+        // Check if we have enough matching letters to form a Bit
+        if (this.letterPool.groups[letter] >= 9) {
+            // Form a Bit
+            this.entropyState.totalWords++;
             this.letterPool.groups[letter] -= 9;
             this.letterPool.totalUnprocessed -= 9;
-            this.letterPool.letterHistory.processed += 9;
-        }
-    }
+            console.log(`Bit formed from letter "${letter}": { remainingInGroup: ${this.letterPool.groups[letter]}, totalBits: ${this.entropyState.totalWords} }`);
 
-    processLetter(letter) {
-        if (this.entropyState.totalLetters >= this.dataStorage.maxCapacity) {
-            return {
-                success: false,
-                reason: 'capacity_reached',
-                status: this.getStorageStatus()
-            };
-        }
-
-        // Process through NodeChannelEntropy first
-        const channelResult = this.nodeChannelEntropy.processLetter(letter, this.lossFunction);
-        
-        if (channelResult) {
-            if (channelResult.type === 'entropy') {
-                this.entropyTracking.greekLetters.push({
-                    value: channelResult.value,
-                    timestamp: Date.now()
-                });
-                this.entropyState.totalEntropy++;
-            } else {
-                this.updateLetterPool(letter);
-                this.dataStorage.letters.push({
-                    value: letter,
-                    timestamp: Date.now(),
-                    processed: false,
-                    position: this.dataStorage.letters.length,
-                    isEntropy: false
-                });
-            }
-        }
-        
-        this.entropyState.totalLetters = this.dataStorage.letters.filter(
-            l => !l.processed && !l.isEntropy
-        ).length;
-        
-        this.loggingState.lettersSinceLastLog++;
-        
-        this.processLetterBuffer();
-        this.updateDashboard();
-        
-        return {
-            success: true,
-            status: this.getStorageStatus()
-        };
-    }
-
-    processLetterBuffer() {
-        for (const [letter, count] of Object.entries(this.letterPool.groups)) {
-            if (count >= 9) {
-                const unprocessedOfType = this.dataStorage.letters
-                    .filter(l => !l.processed && l.value === letter)
-                    .slice(0, 9);
-                
-                // Verify we have exactly 9 letters before processing
-                if (unprocessedOfType.length === 9) {
-                    this.words.push(letter.repeat(9));
-                    this.entropyState.totalWords++;
-                    this.entropyState.totalLetters -= 9;
-                    this.loggingState.wordsFormedSinceLastLog++;
-                    
-                    this.updateLetterPool(letter, false);
-                    
-                    unprocessedOfType.forEach(letter => {
-                        letter.processed = true;
-                    });
-                    
-                    this.dataStorage.processedLetters += 9;
-                    
-                    // Update ratio after word formation
-                    this.entropyState.currentRatio = this.entropyState.totalWords / this.entropyState.totalLetters;
-                }
+            // Dispatch Bit update
+            const mapping = this.nodeChannelEntropy.bitToEntropyMapping[letter];
+            if (mapping && this.intelligenceEnabled) {
+                this.dispatchIntelligenceUpdate(mapping.channel, -1, 'bit');
             }
         }
     }
 
+    // Dispatch Intelligence Update Event
+    dispatchIntelligenceUpdate(channel, delta, type) {
+        if (this.intelligenceEnabled) {
+            console.log(`Dispatching intelligence update: { channel: "${channel}", delta: ${delta}, type: "${type}" }`);
+            const event = new CustomEvent('intelligence-update', {
+                bubbles: true,
+                detail: { channel, delta, type }
+            });
+            document.dispatchEvent(event);
+        } else {
+            console.log('Intelligence update blocked - intelligence disabled');
+        }
+    }
+
+    // Update Dashboard UI
     updateDashboard() {
         const systemD = document.getElementById('system-d');
         const systemB = document.getElementById('system-b');
         const systemE = document.getElementById('system-e');
-        const bdRatio = document.getElementById('system-bd-ratio');
-        const edRatio = document.getElementById('system-ed-ratio');
-        const beRatio = document.getElementById('system-be-ratio');
-        const edbRatio = document.getElementById('system-edb-ratio');
+        const systemBERatio = document.getElementById('system-be-ratio');
+
+        if (systemD) systemD.value = this.entropyState.totalLetters;
+        if (systemB) systemB.value = this.entropyState.totalWords;
+        if (systemE) systemE.value = this.entropyState.totalEntropy;
         
-        // Update base values
-        if (systemD) systemD.value = this.entropyState.totalLetters.toString();
-        if (systemB) systemB.value = this.entropyState.totalWords.toString();
-        if (systemE) systemE.value = this.entropyState.totalEntropy.toString();
-        
-        // Calculate and update ratios
-        if (bdRatio) {
-            bdRatio.value = (this.entropyState.totalWords / this.entropyState.totalLetters).toFixed(4);
-        }
-        
-        if (edRatio) {
-            edRatio.value = (this.entropyState.totalEntropy / this.entropyState.totalLetters).toFixed(4);
-        }
-        
-        if (beRatio) {
-            const beValue = this.entropyState.totalEntropy > 0 
-                ? (this.entropyState.totalWords / this.entropyState.totalEntropy).toFixed(4)
-                : '0.0000';
-            beRatio.value = beValue;
-        }
-
-        if (edbRatio) {
-            // Calculate (E+D)/B ratio
-            const combinedED = this.entropyState.totalEntropy + this.entropyState.totalLetters;
-            const edbValue = this.entropyState.totalWords > 0 
-                ? (combinedED / this.entropyState.totalWords).toFixed(4)
-                : '0.0000';
-            edbRatio.value = edbValue;
-        }
-
-        // Update system status log
-        if (this.loggingState.lettersSinceLastLog >= this.loggingState.logInterval) {
-            const unprocessedLetters = this.dataStorage.letters.filter(
-                l => !l.processed && !l.isEntropy
-            );
-            
-            console.log('System Status Report:', {
-                lettersSinceLastReport: this.loggingState.lettersSinceLastLog,
-                currentPoolSize: unprocessedLetters.length,
-                currentPool: unprocessedLetters.map(l => l.value).join(''),
-                wordsFormedSinceLastReport: this.loggingState.wordsFormedSinceLastLog,
-                currentBDRatio: this.entropyState.currentRatio.toFixed(4),
-                totalLettersInSystem: this.entropyState.totalLetters,
-                totalWordsFormed: this.entropyState.totalWords,
-                entropyStatus: {
-                    totalGreekLetters: this.entropyTracking.greekLetters.length,
-                    currentEntropyPool: this.entropyTracking.greekLetters.map(l => l.value).join('')
-                }
-            });
-
-            // Reset logging counters
-            this.resetLoggingCounters();
-        }
-    }
-
-    getEntropyState() {
-        const systemCapacity = this.rulesModule.calculateArea();
-        return {
-            ...this.entropyState,
-            currentBuffer: this.letterBuffer.join(''),
-            wordsFound: this.words.length,
-            capacityRemaining: systemCapacity - this.entropyState.capacityUsed,
-            totalCapacity: systemCapacity
-        };
-    }
-
-    isRepeatingSequence(letters) {
-        const isRepeating = letters.length === 3 && 
-                           letters[0] === letters[1] && 
-                           letters[1] === letters[2];
-        
-        console.log('Checking repeating sequence:', {
-            letters: letters,
-            isRepeating: isRepeating,
-            length: letters.length,
-            firstMatch: letters[0] === letters[1],
-            secondMatch: letters[1] === letters[2]
-        });
-        
-        return isRepeating;
-    }
-
-    getBufferContents() {
-        return this.letterBuffer.join('');
-    }
-
-    getWords() {
-        return this.words;
-    }
-
-    clearBuffer() {
-        this.letterBuffer = [];
-    }
-
-    getStorageStatus() {
-        const currentCapacity = parseFloat(document.querySelector('#system-c')?.value) || this.dataStorage.maxCapacity;
-        const unprocessedCount = this.dataStorage.letters.filter(
-            l => !l.processed && !l.isEntropy
-        ).length;
-        
-        return {
-            totalLetters: unprocessedCount,  // D is unprocessed, non-entropy letters
-            processedLetters: this.dataStorage.processedLetters,
-            capacityUsed: ((unprocessedCount + this.entropyState.totalEntropy) / currentCapacity) * 100,
-            capacityRemaining: currentCapacity - (unprocessedCount + this.entropyState.totalEntropy),
-            unprocessedCount: unprocessedCount,
-            totalWords: this.entropyState.totalWords,
-            currentRatio: this.entropyState.currentRatio,
-            bufferContents: this.letterBuffer.join('')
-        };
-    }
-
-    resetLoggingCounters() {
-        this.loggingState.lettersSinceLastLog = 0;
-        this.loggingState.wordsFormedSinceLastLog = 0;
-        this.loggingState.lastRatio = this.entropyState.currentRatio;
-    }
-    
-    resetSystem() {
-        // Reset all counters and storage
-        this.dataStorage.letters = [];
-        this.dataStorage.processedLetters = 0;
-        
-        this.letterPool = {
-            groups: {},
-            totalUnprocessed: 0,
-            letterHistory: {
-                added: 0,
-                processed: 0,
-                carryOverFromLastInterval: 0
+        if (systemBERatio) {
+            if (this.entropyState.totalEntropy === 0) {
+                systemBERatio.value = 'N/A';
+            } else {
+                const ratio = this.entropyState.totalWords / this.entropyState.totalEntropy;
+                systemBERatio.value = ratio.toFixed(2);
             }
-        };
-    
-        this.entropyState.totalLetters = 0;
-        this.entropyState.totalWords = 0;
-        this.entropyState.currentRatio = 0;
-        
-        this.words = [];
-        this.letterBuffer = [];
-        
-        // Reset logging state
-        this.loggingState = {
-            lettersSinceLastLog: 0,
-            wordsFormedSinceLastLog: 0,
-            lastRatio: 0,
-            logInterval: 300
-        };
-    
-        // Reset entropy tracking
-        this.entropyState.totalEntropy = 0;
-        this.entropyTracking.processedToEntropy = 0;
-        this.entropyTracking.currentLossRate = 0;
-        this.entropyTracking.greekLetters = [];
-    
-        // Update dashboard
-        this.updateDashboard();
-        
-        console.log('System reset to zero');
-        
-        // Make sure to reset all ratios
-        const ratios = ['system-bd-ratio', 'system-ed-ratio', 'system-be-ratio', 'system-edb-ratio'];
-        ratios.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) element.value = '0.0000';
-        });
+        }
+    }
+
+    // Initialize or Reset System State
+    generateInitialDataset() {
+        console.log('Initializing clean system state...');
+        // Reset all counts
+        this.letterPool = { groups: {}, totalUnprocessed: 0 };
+        this.entropyState = { totalLetters: 0, totalWords: 0, totalEntropy: 0 };
+        console.log('System initialized with clean state:', this.entropyState);
     }
 } 

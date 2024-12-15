@@ -3,7 +3,7 @@ class EnvironmentModule {
         this.intelligenceModule = intelligenceModule;
         this.isGenerating = false;
         this.generationInterval = null;
-        this.flowRate = 100;
+        this.flowRate = 10;
         
         // Updated alphabet: 26 letters plus 4 special characters (30 total characters)
         this.alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ/+&∅';

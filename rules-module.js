@@ -1376,12 +1376,7 @@ class TriangleSystem {
         // Calculate nine-point center
         this.calculateNinePointCenter();
 
-        console.log("Updated all centers:", {
-            circumcenter: this.system.circumcenter,
-            orthocenter: this.system.orthocenter,
-            subcenter: this.system.subcenter,
-            ninePointCenter: this.system.ninePointCenter
-        });
+
     }
 
     /**
@@ -1506,9 +1501,7 @@ class TriangleSystem {
             const incircleEntropy = 2 * Math.PI * inradius;
             setElementValue('#incircle-entropy', incircleEntropy);
 
-            // Debug log to check values
-            console.log('Area calculation:', area);
-            console.log('Perimeter calculation:', perimeter);
+            
 
             // Update both dashboard and Information Panel
             
@@ -1692,11 +1685,7 @@ class TriangleSystem {
             const ic3 = parseFloat(document.getElementById('ic-3')?.value) || 0;
             const hic = ic1 + ic2 + ic3;
             setElementValue('#system-mch', hic.toFixed(2));
-            console.log('Updated HIC calculation:', {
-                ic1, ic2, ic3,
-                total: hic,
-                elementId: 'system-mch'
-            });
+            
 
             // Get System Perimeter Entropy (HP) - Update selector to match HTML
             const hp = parseFloat(document.querySelector('#system-sph')?.value) || 0;
@@ -1988,7 +1977,7 @@ class TriangleSystem {
                         `#mid${i}-coords`,
                         `${m.point.x.toFixed(1)}, ${m.point.y.toFixed(1)}`
                     );
-                    console.log(`Updated mid${i}-coords: ${m.point.x.toFixed(1)}, ${m.point.y.toFixed(1)}`);
+                    
                     
                     // Update median lengths with correct mapping
                     let medianLengthId;
@@ -2005,7 +1994,7 @@ class TriangleSystem {
                     }
                     
                     setElementValue(medianLengthId, m.length.toFixed(2));
-                    console.log(`Updated ${medianLengthId}: ${m.length.toFixed(2)}`);
+                    
                 } else {
                     console.warn(`Full median data not found for m${i}`);
                 }
@@ -2090,7 +2079,7 @@ class TriangleSystem {
                         // Remove parentheses, just use comma-separated values
                         const coordString = `${this.formatValue(point.x)}, ${this.formatValue(point.y)}`;
                         inputElement.value = coordString;
-                        console.log(`Set T${i} to:`, coordString);
+                        
                     } else {
                         if (inputElement) {
                             inputElement.value = '-, -';
@@ -2933,11 +2922,7 @@ class TriangleSystem {
             m3: this.calculateMidpoint(this.system.n2, this.system.n3)   // Opposite to N1
         };
         
-        console.log('Calculated midpoints:', {
-            'm1 (N1-N3)': midpoints.m1,
-            'm2 (N1-N2)': midpoints.m2,
-            'm3 (N3-N2)': midpoints.m3
-        });
+
         
         // Store midpoints in the system for global access
         this.system.midpoints = midpoints;
@@ -3805,7 +3790,7 @@ class TriangleSystem {
             circumcenter = { x, y };
         }
 
-        console.log("Calculated circumcenter:", circumcenter);
+        
         return circumcenter;
     }
 
@@ -4708,8 +4693,7 @@ class TriangleSystem {
                 'manual-ic3': this.calculateDistance(centroid, this.system.n3)   // I to Node 3
             };
 
-            // Debug log for Manual IC Values
-            console.log('Calculated Manual IC Values:', icValues);
+            
 
             // Update Manual IC Fields while preserving editability
             Object.entries(icValues).forEach(([id, value]) => {
@@ -5172,11 +5156,7 @@ class TriangleSystem {
             // Normalize Euler line angle to positive value
             if (elAngle < 0) elAngle += 360;
             
-            console.log('Euler Line:', {
-                orthocenter: `(${orthocenter.x}, ${orthocenter.y})`,
-                circumcenter: `(${circumcenter.x}, ${circumcenter.y})`,
-                angle: elAngle
-            });
+            
             
             const ncs = [
                 { id: 'nc1', points: [this.system.n1, this.system.n3] },
@@ -5187,10 +5167,7 @@ class TriangleSystem {
             const angles = {};
 
             ncs.forEach(nc => {
-                console.log(`\nChecking ${nc.id}:`, {
-                    start: `(${nc.points[0].x}, ${nc.points[0].y})`,
-                    end: `(${nc.points[1].x}, ${nc.points[1].y})`
-                });
+                
 
                 const intersects = this.lineSegmentsIntersect(
                     orthocenter, circumcenter,
@@ -5212,12 +5189,7 @@ class TriangleSystem {
                     if (angleDiff > 180) angleDiff = 360 - angleDiff;
                     if (angleDiff > 90) angleDiff = 180 - angleDiff;
                     
-                    console.log(`${nc.id} calculation:`, {
-                        ncAngle,
-                        elAngle,
-                        rawDiff: Math.abs(ncAngle - elAngle),
-                        normalizedDiff: angleDiff
-                    });
+                    
                     
                     angles[`${nc.id}_acute`] = angleDiff.toFixed(2);
                     angles[`${nc.id}_obtuse`] = (180 - angleDiff).toFixed(2);
@@ -5282,7 +5254,7 @@ class TriangleSystem {
                 );
                 
                 if (isNode) {
-                    console.log('Intersection is at a node - ignoring');
+                    
                     return false;
                 }
                 return true;
@@ -5354,7 +5326,7 @@ class TriangleSystem {
                 const ncLength = ncLengths[`nc${i}`];
                 const rMTNC = ncLength !== 0 ? dMT / ncLength : 0;
                 
-                console.log(`Channel ${i}:`, { dMT, ncLength, rMTNC });
+                
                 
                 const input = document.getElementById(`r-m-t-nc${i}`);
                 if (input) {

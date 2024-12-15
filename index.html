@@ -189,7 +189,7 @@
                         </div>
                         <div class="input-row">
                             <label for="loss-rate">Loss %</label>
-                            <input type="number" id="loss-rate" min="0" max="100" value="5">
+                            <input type="number" id="loss-rate" min="0" max="100" value="0">
                         </div>
                     </div>
                 </div>
@@ -213,7 +213,11 @@
                     <!-- System Controls Section -->
                     <div class="data-controls-section">
                         <button id="letterFlowToggle" class="btn btn-primary btn-sm w-100 mb-2">Start Flow</button>
-                        <button id="intelligenceToggle" class="btn btn-primary btn-sm w-100 mb-2">Intelligence</button>
+                        <button id="intelligenceToggle" class="btn btn-primary btn-sm w-100 mb-2">
+                            Intelligence
+                            <span class="status-icon-off">✖️</span>
+                            <span class="status-icon-on">✔️</span>
+                        </button>
                         <button id="zeroDataButton" class="btn btn-primary btn-sm w-100">Zero Data</button>
                     </div>
                 </div>
