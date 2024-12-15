@@ -145,6 +145,12 @@ class IntelligenceModule {
         // Initialize clean system state
         this.generateInitialDataset();
         this.updateDashboard();
+
+        // Initialize Zero Data button
+        const zeroDataButton = document.getElementById('zeroDataButton');
+        if (zeroDataButton) {
+            zeroDataButton.addEventListener('click', () => this.resetAllData());
+        }
     }
 
     initializeSystemInputs() {
@@ -338,5 +344,23 @@ class IntelligenceModule {
         this.letterPool = { groups: {}, totalUnprocessed: 0 };
         this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0 };
         console.log('System initialized with clean state:', this.entropyState);
+    }
+
+    resetAllData() {
+        console.log('Resetting all data to zero...');
+        
+        // Reset all counters
+        this.letterPool = { groups: {}, totalUnprocessed: 0 };
+        this.entropyState = {
+            totalLetters: 0,      // Total Data (D)
+            netLetters: 0,        // Net Data
+            totalWords: 0,        // Total Bits (B)
+            totalEntropy: 0       // Total Entropy (E)
+        };
+
+        // Update the dashboard
+        this.updateDashboard();
+
+        console.log('Data reset complete:', this.entropyState);
     }
 } 
