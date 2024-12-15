@@ -109,6 +109,9 @@ class NodeChannelEntropy {
 
 class IntelligenceModule {
     constructor() {
+        // Add data reduction rate to state
+        this.dataReductionRate = 9; // Default 9:1 ratio
+
         // Private variable to track intelligence state
         this._intelligenceEnabled = false;
 
@@ -123,6 +126,7 @@ class IntelligenceModule {
         };
         this.entropyState = {
             totalLetters: 0,      // Total Data (D)
+            netLetters: 0,        // Net Data (after Bit formation and Entropy loss)
             totalWords: 0,        // Total Bits (B)
             totalEntropy: 0       // Total Entropy (E)
         };
@@ -144,6 +148,19 @@ class IntelligenceModule {
                 if (!isNaN(value) && value >= 0 && value <= 100) {
                     this.lossFunction.setLossFactor(value / 100);
                     console.log(`Loss factor updated to: ${value} %`);
+                }
+            });
+        }
+
+        // Initialize data reduction input
+        const dataReductionInput = document.getElementById('data-reduction');
+        if (dataReductionInput) {
+            dataReductionInput.value = this.dataReductionRate;
+            dataReductionInput.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                if (!isNaN(value) && value >= 0) {
+                    this.dataReductionRate = value;
+                    console.log(`Data reduction rate updated to: ${value}`);
                 }
             });
         }
@@ -185,6 +202,10 @@ class IntelligenceModule {
     processLetter(letter) {
         console.log(`Processing letter: "${letter}"`);
 
+        // Increment total and net data immediately upon entry
+        this.entropyState.totalLetters++;
+        this.entropyState.netLetters++;
+
         // Process through loss function to determine if it's entropy
         const result = this.lossFunction.processDataLoss(letter);
         console.log(`Result of loss function: ${result.entropy ? 'Entropy (E)' : 'Data (D)'}`);
@@ -192,7 +213,8 @@ class IntelligenceModule {
         if (result.entropy) {
             // Handle entropy case
             this.entropyState.totalEntropy++;
-            console.log(`Entropy incremented to: ${this.entropyState.totalEntropy}`);
+            this.entropyState.netLetters--; // Decrement net data when it becomes entropy
+            console.log(`Entropy incremented to: ${this.entropyState.totalEntropy}, Net Data decremented to: ${this.entropyState.netLetters}`);
 
             // Dispatch entropy update
             const mapping = this.nodeChannelEntropy.bitToEntropyMapping[letter];
@@ -206,30 +228,35 @@ class IntelligenceModule {
         }
 
         this.updateDashboard();
-    }
-
-    // Add Letter to Data Pool
+    }    
+    
+    // Update addToDataPool method
     addToDataPool(letter) {
-        // Initialize group if it doesn't exist
         if (!this.letterPool.groups[letter]) {
             this.letterPool.groups[letter] = 0;
         }
 
-        // Add letter to its group
         this.letterPool.groups[letter]++;
         this.letterPool.totalUnprocessed++;
-        this.entropyState.totalLetters++;
-        console.log(`Added to Data pool: { letter: "${letter}", count: ${this.letterPool.groups[letter]}, totalLetters: ${this.entropyState.totalLetters}, totalUnprocessed: ${this.letterPool.totalUnprocessed} }`);
+        
+        // Add debug logging for data reduction rate
+        console.log(`Current data reduction rate: ${this.dataReductionRate}`);
+        console.log(`Added to Data pool: { letter: "${letter}", count: ${this.letterPool.groups[letter]}, totalLetters: ${this.entropyState.totalLetters}, netLetters: ${this.entropyState.netLetters}, totalUnprocessed: ${this.letterPool.totalUnprocessed} }`);
 
-        // Check if we have enough matching letters to form a Bit
-        if (this.letterPool.groups[letter] >= 9) {
-            // Form a Bit
+        // Skip bit formation completely if dataReductionRate is 0
+        if (this.dataReductionRate <= 0) {
+            return; // Exit early if reduction rate is 0
+        }
+
+        // Only proceed with bit formation if reduction rate is greater than 0
+        if (this.letterPool.groups[letter] >= this.dataReductionRate) {
             this.entropyState.totalWords++;
-            this.letterPool.groups[letter] -= 9;
-            this.letterPool.totalUnprocessed -= 9;
-            console.log(`Bit formed from letter "${letter}": { remainingInGroup: ${this.letterPool.groups[letter]}, totalBits: ${this.entropyState.totalWords} }`);
+            this.letterPool.groups[letter] -= this.dataReductionRate;
+            this.letterPool.totalUnprocessed -= this.dataReductionRate;
+            this.entropyState.netLetters -= this.dataReductionRate;
 
-            // Dispatch Bit update
+            console.log(`Bit formed from letter "${letter}": { remainingInGroup: ${this.letterPool.groups[letter]}, totalBits: ${this.entropyState.totalWords}, netLetters: ${this.entropyState.netLetters} }`);
+
             const mapping = this.nodeChannelEntropy.bitToEntropyMapping[letter];
             if (mapping && this.intelligenceEnabled) {
                 this.dispatchIntelligenceUpdate(mapping.channel, -1, 'bit');
@@ -254,11 +281,13 @@ class IntelligenceModule {
     // Update Dashboard UI
     updateDashboard() {
         const systemD = document.getElementById('system-d');
+        const systemNetD = document.getElementById('system-net-d');
         const systemB = document.getElementById('system-b');
         const systemE = document.getElementById('system-e');
         const systemBERatio = document.getElementById('system-be-ratio');
 
         if (systemD) systemD.value = this.entropyState.totalLetters;
+        if (systemNetD) systemNetD.value = this.entropyState.netLetters;
         if (systemB) systemB.value = this.entropyState.totalWords;
         if (systemE) systemE.value = this.entropyState.totalEntropy;
         
@@ -277,7 +306,7 @@ class IntelligenceModule {
         console.log('Initializing clean system state...');
         // Reset all counts
         this.letterPool = { groups: {}, totalUnprocessed: 0 };
-        this.entropyState = { totalLetters: 0, totalWords: 0, totalEntropy: 0 };
+        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0 };
         console.log('System initialized with clean state:', this.entropyState);
     }
 } 
