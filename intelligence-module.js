@@ -139,35 +139,65 @@ class IntelligenceModule {
             });
         }
 
-        // Initialize loss rate input
-        const lossInputField = document.getElementById('loss-rate');
-        if (lossInputField) {
-            lossInputField.value = (this.lossFunction.getLossFactor() * 100).toFixed(4);
-            lossInputField.addEventListener('input', (e) => {
-                const value = parseFloat(e.target.value);
-                if (!isNaN(value) && value >= 0 && value <= 100) {
-                    this.lossFunction.setLossFactor(value / 100);
-                    console.log(`Loss factor updated to: ${value} %`);
-                }
-            });
-        }
-
-        // Initialize data reduction input
-        const dataReductionInput = document.getElementById('data-reduction');
-        if (dataReductionInput) {
-            dataReductionInput.value = this.dataReductionRate;
-            dataReductionInput.addEventListener('input', (e) => {
-                const value = parseFloat(e.target.value);
-                if (!isNaN(value) && value >= 0) {
-                    this.dataReductionRate = value;
-                    console.log(`Data reduction rate updated to: ${value}`);
-                }
-            });
-        }
+        // Initialize all system intelligence inputs
+        this.initializeSystemInputs();
 
         // Initialize clean system state
         this.generateInitialDataset();
         this.updateDashboard();
+    }
+
+    initializeSystemInputs() {
+        // Data Reduction input
+        this.setupInput('data-reduction', (value) => {
+            if (!isNaN(value) && value >= 0) {
+                this.dataReductionRate = value;
+                console.log(`Data reduction rate updated to: ${value}`);
+            }
+        });
+
+        // Loss Rate input
+        this.setupInput('loss-rate', (value) => {
+            if (!isNaN(value) && value >= 0 && value <= 100) {
+                this.lossFunction.setLossFactor(value / 100);
+                console.log(`Loss factor updated to: ${value}%`);
+            }
+        });
+
+        // Flow Rate input (if it exists)
+        this.setupInput('flow-rate', (value) => {
+            if (!isNaN(value) && value >= 1 && value <= 100) {
+                // Handle flow rate update
+                console.log(`Flow rate updated to: ${value}`);
+            }
+        });
+    }
+
+    setupInput(inputId, callback) {
+        const input = document.getElementById(inputId);
+        if (input) {
+            // Set initial value if applicable
+            if (inputId === 'data-reduction') {
+                input.value = this.dataReductionRate;
+            } else if (inputId === 'loss-rate') {
+                input.value = (this.lossFunction.getLossFactor() * 100).toFixed(4);
+            }
+
+            // Handle both input and keypress events
+            input.addEventListener('input', (e) => {
+                const value = parseFloat(e.target.value);
+                callback(value);
+            });
+
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent default to avoid form submission
+                    const value = parseFloat(e.target.value);
+                    callback(value);
+                    input.blur(); // Remove focus from input
+                }
+            });
+        }
     }
 
     // Getter for intelligenceEnabled
