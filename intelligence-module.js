@@ -126,9 +126,10 @@ class IntelligenceModule {
         };
         this.entropyState = {
             totalLetters: 0,      // Total Data (D)
-            netLetters: 0,        // Net Data (after Bit formation and Entropy loss)
+            netLetters: 0,        // Net Data
             totalWords: 0,        // Total Bits (B)
-            totalEntropy: 0       // Total Entropy (E)
+            totalEntropy: 0,      // Total Entropy (E)
+            convertedData: 0      // Data converted to B or E
         };
 
         // Add intelligence toggle listener
@@ -249,17 +250,15 @@ class IntelligenceModule {
         if (result.entropy) {
             // Handle entropy case
             this.entropyState.totalEntropy++;
-            this.entropyState.netLetters--; // Decrement net data when it becomes entropy
+            this.entropyState.netLetters--; // Decrement net data
+            this.entropyState.convertedData++; // Increment converted data
             console.log(`Entropy incremented to: ${this.entropyState.totalEntropy}, Net Data decremented to: ${this.entropyState.netLetters}`);
 
-            // Dispatch entropy update
             const mapping = this.nodeChannelEntropy.bitToEntropyMapping[letter];
             if (mapping && this.intelligenceEnabled) {
                 this.dispatchIntelligenceUpdate(mapping.channel, +1, 'entropy');
             }
-
         } else {
-            // Not entropy - add to Data pool
             this.addToDataPool(letter);
         }
 
@@ -290,6 +289,7 @@ class IntelligenceModule {
             this.letterPool.groups[letter] -= this.dataReductionRate;
             this.letterPool.totalUnprocessed -= this.dataReductionRate;
             this.entropyState.netLetters -= this.dataReductionRate;
+            this.entropyState.convertedData += this.dataReductionRate; // Increment converted data
 
             console.log(`Bit formed from letter "${letter}": { remainingInGroup: ${this.letterPool.groups[letter]}, totalBits: ${this.entropyState.totalWords}, netLetters: ${this.entropyState.netLetters} }`);
 
@@ -318,12 +318,14 @@ class IntelligenceModule {
     updateDashboard() {
         const systemD = document.getElementById('system-d');
         const systemNetD = document.getElementById('system-net-d');
+        const systemConverted = document.getElementById('system-converted');
         const systemB = document.getElementById('system-b');
         const systemE = document.getElementById('system-e');
         const systemBERatio = document.getElementById('system-be-ratio');
 
         if (systemD) systemD.value = this.entropyState.totalLetters;
         if (systemNetD) systemNetD.value = this.entropyState.netLetters;
+        if (systemConverted) systemConverted.value = this.entropyState.convertedData;
         if (systemB) systemB.value = this.entropyState.totalWords;
         if (systemE) systemE.value = this.entropyState.totalEntropy;
         
@@ -342,7 +344,7 @@ class IntelligenceModule {
         console.log('Initializing clean system state...');
         // Reset all counts
         this.letterPool = { groups: {}, totalUnprocessed: 0 };
-        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0 };
+        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0, convertedData: 0 };
         console.log('System initialized with clean state:', this.entropyState);
     }
 
@@ -352,10 +354,11 @@ class IntelligenceModule {
         // Reset all counters
         this.letterPool = { groups: {}, totalUnprocessed: 0 };
         this.entropyState = {
-            totalLetters: 0,      // Total Data (D)
-            netLetters: 0,        // Net Data
-            totalWords: 0,        // Total Bits (B)
-            totalEntropy: 0       // Total Entropy (E)
+            totalLetters: 0,
+            netLetters: 0,
+            totalWords: 0,
+            totalEntropy: 0,
+            convertedData: 0
         };
 
         // Update the dashboard
