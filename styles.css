@@ -2026,20 +2026,19 @@ input[id*="euler"] {  /* Added Euler Line inputs */
 
 /* System Intelligence inputs in animation panel */
 .system-intelligence-inputs {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    align-items: center;  /* Center the rows */
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    width: 100% !important;
+    gap: 5px !important; /* Add vertical spacing between rows */
 }
 
 .system-intelligence-inputs .input-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;  /* Center the content */
-    gap: 0.5rem;
-    width: 100%;  /* Full width for proper centering */
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important; /* Vertically center labels and inputs */
+    width: 100% !important;
+    gap: 10px !important; /* Add horizontal spacing between label and input */
 }
 
 .system-intelligence-inputs label {

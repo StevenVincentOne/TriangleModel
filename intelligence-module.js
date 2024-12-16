@@ -129,7 +129,8 @@ class IntelligenceModule {
             netLetters: 0,        // Net Data
             totalWords: 0,        // Total Bits (B)
             totalEntropy: 0,      // Total Entropy (E)
-            convertedData: 0      // Data converted to B or E
+            convertedData: 0,      // Data converted to B or E
+            environmentalNoise: 0  // Add EN counter
         };
 
         // Add intelligence toggle listener
@@ -320,21 +321,23 @@ class IntelligenceModule {
         const systemNetD = document.getElementById('system-net-d');
         const systemConverted = document.getElementById('system-converted');
         const systemB = document.getElementById('system-b');
-        const systemE = document.getElementById('system-e');
-        const systemBERatio = document.getElementById('system-be-ratio');
+        const systemN = document.getElementById('system-n');
+        const systemBNRatio = document.getElementById('system-bn-ratio');
+        const systemEN = document.getElementById('system-en');
 
         if (systemD) systemD.value = this.entropyState.totalLetters;
         if (systemNetD) systemNetD.value = this.entropyState.netLetters;
         if (systemConverted) systemConverted.value = this.entropyState.convertedData;
         if (systemB) systemB.value = this.entropyState.totalWords;
-        if (systemE) systemE.value = this.entropyState.totalEntropy;
+        if (systemN) systemN.value = this.entropyState.totalEntropy;
+        if (systemEN) systemEN.value = this.entropyState.environmentalNoise;
         
-        if (systemBERatio) {
+        if (systemBNRatio) {
             if (this.entropyState.totalEntropy === 0) {
-                systemBERatio.value = 'N/A';
+                systemBNRatio.value = 'N/A';
             } else {
                 const ratio = this.entropyState.totalWords / this.entropyState.totalEntropy;
-                systemBERatio.value = ratio.toFixed(2);
+                systemBNRatio.value = ratio.toFixed(2);
             }
         }
     }
@@ -344,7 +347,7 @@ class IntelligenceModule {
         console.log('Initializing clean system state...');
         // Reset all counts
         this.letterPool = { groups: {}, totalUnprocessed: 0 };
-        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0, convertedData: 0 };
+        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0, convertedData: 0, environmentalNoise: 0 };
         console.log('System initialized with clean state:', this.entropyState);
     }
 
@@ -358,12 +361,30 @@ class IntelligenceModule {
             netLetters: 0,
             totalWords: 0,
             totalEntropy: 0,
-            convertedData: 0
+            convertedData: 0,
+            environmentalNoise: 0
         };
 
         // Update the dashboard
         this.updateDashboard();
 
         console.log('Data reset complete:', this.entropyState);
+    }
+
+    // New method to process Environmental Noise
+    processEN(noise) {
+        console.log(`Processing Environmental Noise: "${noise}"`);
+        this.entropyState.environmentalNoise++;
+        this.entropyState.totalEntropy++; // EN contributes to total entropy
+        
+        // Dispatch entropy update for EN
+        const mapping = this.nodeChannelEntropy.bitToEntropyMapping[noise] || 
+                       { channel: 'NC' + (Math.floor(Math.random() * 3) + 1) };
+        
+        if (this.intelligenceEnabled) {
+            this.dispatchIntelligenceUpdate(mapping.channel, +1, 'entropy');
+        }
+
+        this.updateDashboard();
     }
 } 

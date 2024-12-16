@@ -4,14 +4,21 @@ class EnvironmentModule {
         this.isGenerating = false;
         this.generationInterval = null;
         this.flowRate = 10;
+        this.enFlowRate = 0;
+        this.enGenerationInterval = null;
         
         // Updated alphabet: 26 letters plus 4 special characters (30 total characters)
         this.alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ/+&∅';
+        this.noiseAlphabet = 'αβχδεφγηιξκλμνοπψρστυϑωχψζςΣΩθ';
         
         this.randomGenerator = {
             generateLetter: () => {
                 const index = Math.floor(Math.random() * this.alphabet.length);
                 return this.alphabet[index];
+            },
+            generateNoise: () => {
+                const index = Math.floor(Math.random() * this.noiseAlphabet.length);
+                return this.noiseAlphabet[index];
             }
         };
 
@@ -69,6 +76,27 @@ class EnvironmentModule {
                 this.updateFlowRate(newRate);
             });
         }
+
+        // Add handlers for EN flow rate
+        const enRateInput = document.getElementById('en-flow-rate');
+        if (enRateInput) {
+            enRateInput.value = this.enFlowRate;
+            
+            // Handle both input and keypress events
+            enRateInput.addEventListener('input', (e) => {
+                const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                this.updateENFlowRate(newRate);
+            });
+
+            enRateInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent default to avoid form submission
+                    const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                    this.updateENFlowRate(newRate);
+                    enRateInput.blur(); // Remove focus from input
+                }
+            });
+        }
     }
 
     updateFlowRate(newRate) {
@@ -81,40 +109,60 @@ class EnvironmentModule {
         }
     }
 
+    updateENFlowRate(newRate) {
+        console.log('Updating EN flow rate from', this.enFlowRate, 'to', newRate);
+        this.enFlowRate = newRate;
+        if (this.isGenerating) {
+            this.restartENGeneration();
+        }
+    }
+
     startLetterGeneration() {
-        if (!this.isGenerating && this.flowRate > 0) {
-            console.log(`Starting letter generation at ${this.flowRate} letters/sec`);
+        if (!this.isGenerating) {
+            console.log(`Starting generation - Data rate: ${this.flowRate}/s, EN rate: ${this.enFlowRate}/s`);
             this.isGenerating = true;
             
-            const interval = 1000 / this.flowRate;
-            this.generationInterval = setInterval(() => {
-                const letter = this.randomGenerator.generateLetter();
-                
-                if (this.intelligenceModule) {
-                    const result = this.intelligenceModule.processLetter(letter);
-                    
-                    // Check if system capacity is reached
-                    if (result && !result.success) {
-                        if (result.reason === 'capacity_reached') {
-                            console.log('System capacity reached - stopping letter generation');
-                            this.stopLetterGeneration();
-                            
-                            const toggleBtn = document.getElementById('letterFlowToggle');
-                            if (toggleBtn) {
-                                toggleBtn.textContent = 'Capacity Full';
-                                toggleBtn.disabled = true;
-                            }
-                        }
-                    }
-                }
-            }, interval);
+            // Start Data generation
+            if (this.flowRate > 0) {
+                const interval = 1000 / this.flowRate;
+                this.generationInterval = setInterval(() => {
+                    this.generateData();
+                }, interval);
+            }
+
+            // Start EN generation
+            this.startENGeneration();
+        }
+    }
+
+    startENGeneration() {
+        if (this.enFlowRate > 0) {
+            const enInterval = 1000 / this.enFlowRate;
+            this.enGenerationInterval = setInterval(() => {
+                this.generateEN();
+            }, enInterval);
+        }
+    }
+
+    generateEN() {
+        if (this.intelligenceModule) {
+            const noise = this.randomGenerator.generateNoise();
+            this.intelligenceModule.processEN(noise);
+        }
+    }
+
+    restartENGeneration() {
+        if (this.isGenerating) {
+            clearInterval(this.enGenerationInterval);
+            this.startENGeneration();
         }
     }
 
     stopLetterGeneration() {
         if (this.isGenerating) {
-            console.log('Stopping letter generation');
+            console.log('Stopping all generation');
             clearInterval(this.generationInterval);
+            clearInterval(this.enGenerationInterval);
             this.isGenerating = false;
             
             const toggleBtn = document.getElementById('letterFlowToggle');
@@ -139,5 +187,12 @@ class EnvironmentModule {
         console.log('Mixing data with params:', params);
         // Placeholder for data mixing logic
         return {};
+    }
+
+    generateData() {
+        if (this.intelligenceModule) {
+            const letter = this.randomGenerator.generateLetter();
+            this.intelligenceModule.processLetter(letter);
+        }
     }
 } 

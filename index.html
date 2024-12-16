@@ -168,45 +168,53 @@
                     <!-- System Intelligence Inputs -->
                     <div class="system-intelligence-inputs mt-3">
                         <div class="input-row">
-                            <label for="system-d">Total Data</label>
+                            <label for="system-d">Total Data (D)</label>
                             <input type="text" id="system-d" readonly>
                         </div>
                         <div class="input-row">
-                            <label for="system-net-d">Net Data</label>
+                            <label for="system-net-d">Net D</label>
                             <input type="text" id="system-net-d" readonly>
                         </div>
                         <div class="input-row">
-                            <label for="system-converted">Converted</label>
+                            <label for="system-converted">Converted D</label>
                             <input type="text" id="system-converted" readonly>
                         </div>
                         <div class="input-row">
-                            <label for="system-b">Bits</label>
+                            <label for="system-b">Bits (B)</label>
                             <input type="text" id="system-b" readonly>
                         </div>
                         <div class="input-row">
-                            <label for="system-e">Entropy</label>
-                            <input type="text" id="system-e" readonly>
+                            <label for="system-n">Noise (N)</label>
+                            <input type="text" id="system-n" readonly>
                         </div>
                         <div class="input-row">
-                            <label for="system-be-ratio">B/E</label>
-                            <input type="text" id="system-be-ratio" readonly>
+                            <label for="system-bn-ratio">B/N</label>
+                            <input type="text" id="system-bn-ratio" readonly>
                         </div>
                         <div class="input-row">
-                            <label for="flow-rate">Flow</label>
+                            <label for="flow-rate">D Flow</label>
                             <input type="number" id="flow-rate" min="1" max="100" value="10">
                         </div>
                         <div class="input-row">
-                            <label for="loss-rate">Loss %</label>
+                            <label for="loss-rate">D Loss %</label>
                             <input type="number" id="loss-rate" min="0" max="100" value="0">
                         </div>
                         <div class="input-row">
-                            <label for="data-reduction">Bit Rate</label>
+                            <label for="data-reduction">B Convert Rate</label>
                             <input type="number" 
                                    id="data-reduction" 
                                    min="0" 
                                    max="100" 
                                    step="0.1" 
                                    value="9">
+                        </div>
+                        <div class="input-row">
+                            <label for="system-en">EN</label>
+                            <input type="text" id="system-en" readonly>
+                        </div>
+                        <div class="input-row">
+                            <label for="en-flow-rate">EN Flow</label>
+                            <input type="number" id="en-flow-rate" min="0" max="100" value="0">
                         </div>
                     </div>
                 </div>
