@@ -107,7 +107,7 @@ class NodeChannelEntropy {
     // Removed processLetter as it's handled by IntelligenceModule
 }
 
-class IntelligenceModule {
+export class IntelligenceModule {
     constructor() {
         // Add data reduction rate to state
         this.dataReductionRate = 9; // Default 9:1 ratio
@@ -302,17 +302,24 @@ class IntelligenceModule {
     }
 
     // Dispatch Intelligence Update Event
-    dispatchIntelligenceUpdate(channel, delta, type) {
-        if (this.intelligenceEnabled) {
-            console.log(`Dispatching intelligence update: { channel: "${channel}", delta: ${delta}, type: "${type}" }`);
-            const event = new CustomEvent('intelligence-update', {
-                bubbles: true,
-                detail: { channel, delta, type }
-            });
-            document.dispatchEvent(event);
-        } else {
-            console.log('Intelligence update blocked - intelligence disabled');
-        }
+    dispatchIntelligenceUpdate(channel, delta, type = 'bit') {
+        console.log('Dispatching intelligence update:', {
+            channel,
+            delta,
+            type,
+            eventCreated: true
+        });
+
+        const event = new CustomEvent('intelligence-update', {
+            detail: {
+                channel,
+                delta,
+                type
+            },
+            bubbles: true
+        });
+
+        document.dispatchEvent(event);
     }
 
     // Update Dashboard UI

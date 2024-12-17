@@ -1,4 +1,4 @@
-class EnvironmentModule {
+export class EnvironmentModule {
     constructor(intelligenceModule) {
         this.intelligenceModule = intelligenceModule;
         this.isGenerating = false;
