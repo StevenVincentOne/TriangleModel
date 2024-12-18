@@ -56,20 +56,7 @@ export class TriangleSystem {
             const titleText = manualTitle.textContent;   
             
         }
-        // Initialize storage for user animations
-        this.userAnimations = JSON.parse(localStorage.getItem('userAnimations')) || {};
         
-        // Initialize the animations dropdown
-        this.initializeUserAnimations();
-        
-        // Add Save Animation button listener
-        const saveAnimationButton = document.getElementById('save-animation');
-        if (saveAnimationButton) {
-            saveAnimationButton.addEventListener('click', () => {
-                console.log('Save Animation button clicked');
-                this.saveCurrentAnimation();
-            });
-        }
 
         // Add to your constants/settings section at the top
         const SPECIAL_CENTERS_COLOR = '#FF69B4';  // Pink color for O, H, N
@@ -185,8 +172,6 @@ export class TriangleSystem {
                 }
             };
 
-            
-
             // 3. Update system vertices
             this.system = {
                 ...this.system,
@@ -285,61 +270,6 @@ export class TriangleSystem {
         this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
         this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
         this.canvas.addEventListener('mouseleave', (e) => this.onMouseUp(e));
-
-       
-
-        // Add Preset Dropdown Functionality
-        const presetDropdown = document.getElementById('userPresetsList');
-        const dropdownButton = document.getElementById('userPresetsDropdown');
-        
-        if (presetDropdown && dropdownButton) {
-            // Load saved presets from localStorage
-            const savedPresets = JSON.parse(localStorage.getItem('userPresets')) || {};
-            
-            
-            
-            // Clear existing items
-            presetDropdown.innerHTML = '';
-            
-            // Add each preset to the dropdown
-            Object.entries(savedPresets).forEach(([name, config]) => {
-                const item = document.createElement('li');
-                const link = document.createElement('a');
-                link.className = 'dropdown-item';
-                link.href = '#';
-                link.textContent = name;
-                link.setAttribute('data-preset-name', name);  // Add data attribute
-                item.appendChild(link);
-                presetDropdown.appendChild(item);
-            });
-
-            // Add a single event listener to the dropdown container
-            presetDropdown.addEventListener('click', (e) => {
-                const link = e.target.closest('.dropdown-item');
-                if (!link) return;
-                
-                e.preventDefault();
-                e.stopPropagation();
-                
-                
-            });
-
-            // Initialize Bootstrap dropdown
-            dropdownButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                console.log('Dropdown button clicked');
-                presetDropdown.classList.toggle('show');
-            });
-
-            // Close dropdown when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!dropdownButton.contains(e.target) && !presetDropdown.contains(e.target)) {
-                    presetDropdown.classList.remove('show');
-                }
-            });
-            
-            
-        }
 
         // Add Export button listener with correct ID
         const exportButton = document.getElementById('exportData');
@@ -2797,44 +2727,7 @@ export class TriangleSystem {
 
     
 
-    // Add new method to initialize animations dropdown
-    initializeUserAnimations() {
-        const animationsList = document.getElementById('animationsList');
-        const animationsDropdown = document.getElementById('animationsDropdown');
-        
-        if (!animationsList || !animationsDropdown) {
-            console.error('Animation dropdown elements not found');
-            return;
-        }
-        
-        // Clear existing items
-        animationsList.innerHTML = '';
-        
-        // Add each saved animation to dropdown
-        Object.entries(this.userAnimations).forEach(([name, config]) => {
-            const item = document.createElement('li');
-            const link = document.createElement('a');
-            link.className = 'dropdown-item';
-            link.href = '#';
-            link.textContent = name;
-            item.appendChild(link);
-            animationsList.appendChild(item);
-        });
-
-        // Initialize Bootstrap dropdown functionality
-        animationsDropdown.addEventListener('click', (e) => {
-            e.preventDefault();
-            console.log('Animations dropdown clicked');
-            animationsList.classList.toggle('show');
-        });
-
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!animationsDropdown.contains(e.target) && !animationsList.contains(e.target)) {
-                animationsList.classList.remove('show');
-            }
-        });
-    }
+    
 
     
 
@@ -5010,35 +4903,6 @@ export class TriangleSystem {
             }
         };
     }
-}
-
-
-
-// Outside the class - DOM initialization
-document.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.querySelector('#canvas');
-    if (canvas) {
-        const triangleSystem = new TriangleSystem(canvas);
-    } else {
-        console.error("Canvas element not found");
-    }
-    
-    // Remove duplicate event listeners that are now in initializeEventListeners
-});
-
-// Helper function to convert number to column letter (including multi-letter columns)
-function getColumnLetter(columnNumber) {
-    let dividend = columnNumber;
-    let columnName = '';
-    let modulo;
-
-    while (dividend > 0) {
-        modulo = (dividend - 1) % 26;
-        columnName = String.fromCharCode(65 + modulo) + columnName;
-        dividend = Math.floor((dividend - modulo) / 26);
-    }
-
-    return columnName;
 }
 
 export class RulesModule {
