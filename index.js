@@ -2,6 +2,7 @@
 import { TriangleSystem, RulesModule } from './ss1-state/rules-module.js';
 import { EnvironmentModule } from './ss3-io/environment-module.js';
 import { IntelligenceModule } from './intelligence/intelligence-module.js';
+import { PresetManager, ImportManager } from './shared/ui/ui-manager.js';
 
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {

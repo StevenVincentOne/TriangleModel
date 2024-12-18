@@ -1,4 +1,5 @@
 import { TriangleDatabase } from '../shared/ui/database.js';
+import { PresetManager, ImportManager } from '../shared/ui/ui-manager.js';
 
 export class TriangleSystem {
     constructor(canvasId) {
@@ -161,6 +162,31 @@ export class TriangleSystem {
         
         // Initialize managers
         this.importManager = new ImportManager(this);
+
+        // Initialize animations list with delete handlers that use PresetManager
+        const animationsList = document.getElementById('animationsList');
+        if (animationsList) {
+            animationsList.addEventListener('click', (e) => {
+                const deleteBtn = e.target.closest('.delete-button');
+                if (deleteBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const item = deleteBtn.closest('.dropdown-item');
+                    const name = item.getAttribute('data-preset-name');
+                    if (name) {
+                        this.presetManager.deleteAnimation(name);
+                    }
+                }
+            });
+        }
+
+        // Simple event listener for save button
+        const saveButton = document.getElementById('save-preset');
+        if (saveButton) {
+            saveButton.addEventListener('click', () => {
+                this.presetManager.saveCurrentConfig(this.system);
+            });
+        }
     }  // End of constructor
 
     initializePresets() {
@@ -4646,7 +4672,6 @@ export class TriangleSystem {
             if (elAngle < 0) elAngle += 360;
             
             
-            
             const ncs = [
                 { id: 'nc1', points: [this.system.n1, this.system.n3] },
                 { id: 'nc2', points: [this.system.n1, this.system.n2] },
@@ -4677,7 +4702,6 @@ export class TriangleSystem {
                     let angleDiff = Math.abs(ncAngle - elAngle);
                     if (angleDiff > 180) angleDiff = 360 - angleDiff;
                     if (angleDiff > 90) angleDiff = 180 - angleDiff;
-                    
                     
                     
                     angles[`${nc.id}_acute`] = angleDiff.toFixed(2);
@@ -4891,7 +4915,6 @@ export class TriangleSystem {
         try {
             const centroid = this.calculateCentroid();
             const totalSystemEntropy = this.calculateTotalEntropy();
-            
             
             
             for (let i =1; i <= 3; i++) {
@@ -5666,573 +5689,7 @@ export class TriangleSystem {
     }
 }
 
-class PresetManager {
-    constructor(triangleSystem) {
-        this.triangleSystem = triangleSystem;
-        
-        // Remove any existing click handlers
-        const existingPresetItems = document.querySelectorAll('.dropdown-item[data-preset-name]');
-        existingPresetItems.forEach(item => {
-            item.removeEventListener('click', null);
-        });
-        
-        // Initialize dropdowns
-        this.userPresetsDropdown = document.getElementById('userPresetsDropdown');
-        this.presetsList = document.getElementById('userPresetsList');
-        this.animationsDropdown = document.getElementById('animationsDropdown');
-        this.animationsList = document.getElementById('animationsList');
-        
-        this.initializePresetsDropdown();
-        this.initializeAnimationsDropdown();
-        this.setupEventListeners();
-    }
 
-    initializePresetsDropdown() {
-        if (!this.userPresetsDropdown || !this.presetsList) {
-            console.error('Presets dropdown elements not found');
-            return;
-        }
-
-        // Remove old event listeners
-        const oldItems = this.presetsList.querySelectorAll('.dropdown-item');
-        oldItems.forEach(item => {
-            item.replaceWith(item.cloneNode(true));
-        });
-
-        // Get presets from storage and convert to sorted array
-        const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-        const sortedPresets = Object.entries(presets)
-            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
-        
-        // Clear and populate dropdown
-        this.presetsList.innerHTML = '';
-        
-        sortedPresets.forEach(([name, values]) => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.className = 'dropdown-item';
-            a.href = '#';
-            
-            // Create container for name and buttons
-            const container = document.createElement('div');
-            container.className = 'preset-item-container';
-            
-            // Add preset name
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'preset-name';
-            nameSpan.textContent = name;
-            container.appendChild(nameSpan);
-            
-            // Add edit button
-            const editBtn = document.createElement('button');
-            editBtn.className = 'edit-btn';
-            editBtn.innerHTML = '✎';
-            editBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.editPreset(name, values);
-            };
-            container.appendChild(editBtn);
-            
-            // Add delete button
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.innerHTML = '×';
-            deleteBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.deletePreset(name);
-            };
-            container.appendChild(deleteBtn);
-            
-            a.appendChild(container);
-            li.appendChild(a);
-            this.presetsList.appendChild(li);
-            
-            // Add click handler for loading preset
-            a.onclick = (e) => {
-                e.preventDefault();
-                this.loadPreset(name, values);
-            };
-        });
-    }
-
-    initializeAnimationsDropdown() {
-        if (!this.animationsDropdown || !this.animationsList) {
-            console.error('Animations dropdown elements not found');
-            return;
-        }
-
-        // Clear existing items
-        this.animationsList.innerHTML = '';
-
-        // Get saved animations and sort alphabetically
-        const savedAnimations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-        const sortedAnimations = Object.entries(savedAnimations)
-            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
-        
-        if (sortedAnimations.length > 0) {
-            sortedAnimations.forEach(([name, config]) => {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.className = 'dropdown-item';
-                a.href = '#';
-                
-                // Create container for name and buttons
-                const container = document.createElement('div');
-                container.className = 'preset-item-container';
-                
-                // Add animation name
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'preset-name';
-                nameSpan.textContent = name;
-                container.appendChild(nameSpan);
-                
-                // Add edit button
-                const editBtn = document.createElement('button');
-                editBtn.className = 'edit-btn';
-                editBtn.innerHTML = '✎';
-                editBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    this.editAnimation(name, config);
-                };
-                container.appendChild(editBtn);
-                
-                // Add delete button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-btn';
-                deleteBtn.innerHTML = '×';
-                deleteBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    this.deleteAnimation(name);
-                };
-                container.appendChild(deleteBtn);
-                
-                a.appendChild(container);
-                li.appendChild(a);
-                this.animationsList.appendChild(li);
-                
-                // Add click handler for loading animation
-                a.onclick = (e) => {
-                    e.preventDefault();
-                    this.playAnimation(name, config);
-                };
-            });
-        } else {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.className = 'dropdown-item disabled';
-            a.href = '#';
-            a.textContent = 'No saved animations';
-            li.appendChild(a);
-            this.animationsList.appendChild(li);
-        }
-    }
-
-    // Add these new methods to handle editing and deleting animations
-    editAnimation(name, config) {
-        const newName = prompt('Enter new name for animation:', name);
-        if (newName && newName !== name) {
-            try {
-                // Get current animations
-                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-                
-                // Delete old name and add with new name
-                delete animations[name];
-                animations[newName] = config;
-                
-                // Save back to storage
-                localStorage.setItem('userAnimations', JSON.stringify(animations));
-                
-                // Refresh dropdown
-                this.initializeAnimationsDropdown();
-                
-                console.log('Animation renamed:', name, 'to', newName);
-            } catch (error) {
-                console.error('Error editing animation:', error);
-                alert('Error editing animation. Please try again.');
-            }
-        }
-    }
-
-    deleteAnimation(name) {
-        if (confirm(`Are you sure you want to delete the animation "${name}"?`)) {
-            try {
-                // Get current animations
-                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-                
-                // Delete the animation
-                delete animations[name];
-                
-                // Save back to storage
-                localStorage.setItem('userAnimations', JSON.stringify(animations));
-                
-                // Refresh dropdown
-                this.initializeAnimationsDropdown();
-                
-                console.log('Animation deleted:', name);
-            } catch (error) {
-                console.error('Error deleting animation:', error);
-                alert('Error deleting animation. Please try again.');
-            }
-        }
-    }
-
-    setupEventListeners() {
-        // Presets dropdown toggle
-        this.userPresetsDropdown.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Toggle presets dropdown');
-            this.presetsList.classList.toggle('show');
-        });
-
-        // Animations dropdown toggle
-        this.animationsDropdown.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('Toggle animations dropdown');
-            this.animationsList.classList.toggle('show');
-        });
-
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!this.userPresetsDropdown.contains(e.target) && 
-                !this.presetsList.contains(e.target)) {
-                this.presetsList.classList.remove('show');
-            }
-            if (!this.animationsDropdown.contains(e.target) && 
-                !this.animationsList.contains(e.target)) {
-                this.animationsList.classList.remove('show');
-            }
-        });
-    }
-
-    loadPreset(name, values) {
-        try {
-            console.log('Loading preset:', name, values);
-            
-            // Update vertex positions directly
-            if (this.triangleSystem) {
-                // Update the system's vertices
-                this.triangleSystem.system = {
-                    ...this.triangleSystem.system,
-                    n1: { 
-                        x: parseFloat(values.n1?.x) || 0, 
-                        y: parseFloat(values.n1?.y) || 0 
-                    },
-                    n2: { 
-                        x: parseFloat(values.n2?.x) || 0, 
-                        y: parseFloat(values.n2?.y) || 0 
-                    },
-                    n3: { 
-                        x: parseFloat(values.n3?.x) || 0, 
-                        y: parseFloat(values.n3?.y) || 0 
-                    },
-                    intelligence: { x: 0, y: 0 }  // Reset intelligence point
-                };
-                
-                // Recalculate derived points
-                this.triangleSystem.updateDerivedPoints();
-                
-                // Update display
-                this.triangleSystem.drawSystem();
-                this.triangleSystem.updateDashboard();
-                
-                console.log('Triangle system updated directly');
-            } else {
-                console.error('Triangle system reference not found');
-            }
-
-            // Close the dropdown
-            this.presetsList.classList.remove('show');
-
-            console.log('Preset loaded and applied successfully');
-        } catch (error) {
-            console.error('Error loading preset:', error);
-        }
-    }
-
-    startAnimation(animationType) {
-        console.log('Starting animation:', animationType);
-        // Add animation logic here
-    }
-
-    // Add this method to handle animation playback
-    playAnimation(name, config) {
-        console.log('Playing animation:', name, config);
-        if (this.triangleSystem) {
-            // Populate start values
-            const startNc1Input = document.getElementById('animation-nc1-start');
-            const startNc2Input = document.getElementById('animation-nc2-start');
-            const startNc3Input = document.getElementById('animation-nc3-start');
-
-            if (startNc1Input && startNc2Input && startNc3Input) {
-                startNc1Input.value = config.start.nc1;
-                startNc2Input.value = config.start.nc2;
-                startNc3Input.value = config.start.nc3;
-                console.log('Updated start fields:', config.start);
-            } else {
-                console.error('Some animation start input fields not found');
-            }
-
-            // Populate end values
-            const endNc1Input = document.getElementById('animation-nc1-end');
-            const endNc2Input = document.getElementById('animation-nc2-end');
-            const endNc3Input = document.getElementById('animation-nc3-end');
-
-            if (endNc1Input && endNc2Input && endNc3Input) {
-                endNc1Input.value = config.end.nc1;
-                endNc2Input.value = config.end.nc2;
-                endNc3Input.value = config.end.nc3;
-                console.log('Updated end fields:', config.end);
-            } else {
-                console.error('Some animation end input fields not found');
-            }
-
-            // Optional: Update the current triangle to match start position
-            this.triangleSystem.system = {
-                ...this.triangleSystem.system,
-                nc1: config.start.nc1,
-                nc2: config.start.nc2,
-                nc3: config.start.nc3
-            };
-            this.triangleSystem.drawSystem();
-        }
-    }
-
-    editPreset(name, values) {
-        const newName = prompt('Enter new name for preset:', name);
-        if (newName && newName !== name) {
-            try {
-                // Get current presets
-                const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-                
-                // Delete old name and add with new name
-                delete presets[name];
-                presets[newName] = values;
-                
-                // Save back to storage
-                localStorage.setItem('userPresets', JSON.stringify(presets));
-                
-                // Refresh dropdown
-                this.initializePresetsDropdown();
-                
-                console.log('Preset renamed:', name, 'to', newName);
-            } catch (error) {
-                console.error('Error editing preset:', error);
-                alert('Error editing preset. Please try again.');
-            }
-        }
-    }
-
-    deletePreset(name) {
-        if (confirm(`Are you sure you want to delete the preset "${name}"?`)) {
-            try {
-                // Get current presets
-                const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-                
-                // Delete the preset
-                delete presets[name];
-                
-                // Save back to storage
-                localStorage.setItem('userPresets', JSON.stringify(presets));
-                
-                // Refresh dropdown
-                this.initializePresetsDropdown();
-                
-                console.log('Preset deleted:', name);
-            } catch (error) {
-                console.error('Error deleting preset:', error);
-                alert('Error deleting preset. Please try again.');
-            }
-        }
-    }
-}
-
-class ImportManager {
-    constructor(triangleSystem) {
-        this.triangleSystem = triangleSystem;
-        this.initializeImportButton();
-    }
-
-    initializeImportButton() {
-        const importButton = document.getElementById('importButton');
-        const fileInput = document.getElementById('importFile');
-
-        if (!importButton || !fileInput) {
-            console.error('Import button or file input not found');
-            return;
-        }
-
-        // Handle import button click
-        importButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            fileInput.click();
-        });
-
-        // Handle file selection
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                this.importPresets(file);
-                fileInput.value = ''; // Reset file input
-            }
-        });
-    }
-
-    importPresets(file) {
-        console.log('Starting import process for file:', file.name);
-        const reader = new FileReader();
-
-        reader.onload = (e) => {
-            try {
-                const text = e.target.result;
-                console.log('File contents loaded, first 100 chars:', text.substring(0, 100));
-
-                // Get existing presets first
-                const existingPresets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-                console.log('Existing presets:', Object.keys(existingPresets).length);
-
-                // Parse and process the CSV data
-                const newPresets = this.parseCSVToPresets(text);
-                const newPresetCount = Object.keys(newPresets).length;
-                console.log('New presets created:', newPresetCount);
-
-                if (newPresetCount === 0) {
-                    throw new Error('No valid presets found in file');
-                }
-
-                // Merge presets
-                const mergedPresets = { ...existingPresets, ...newPresets };
-                
-                // Save to localStorage
-                localStorage.setItem('userPresets', JSON.stringify(mergedPresets));
-                console.log('Saved merged presets:', Object.keys(mergedPresets).length);
-
-                // Notify user
-                alert(`Successfully imported ${newPresetCount} presets`);
-
-                // Only update the presets dropdown, not animations
-                if (this.triangleSystem.initializePresets) {
-                    this.triangleSystem.initializePresets();
-                }
-
-            } catch (error) {
-                console.error('Error during import:', error);
-                alert('Error importing presets. Please check the console for details.');
-            }
-        };
-
-        reader.onerror = (error) => {
-            console.error('Error reading file:', error);
-            alert('Error reading file. Please try again.');
-        };
-
-        reader.readAsText(file);
-    }
-
-    parseCSVToPresets(csvText) {
-        const presets = {};
-        
-        // Split into rows and filter out empty ones
-        const rows = csvText.split('\n')
-            .map(row => row.trim())
-            .filter(row => row.length > 0);
-
-        console.log('First few rows:', rows.slice(0, 3));
-
-        // Skip header row
-        for (let i = 1; i < rows.length; i++) {
-            try {
-                const row = rows[i];
-                console.log(`Processing row ${i}:`, row);
-
-                // Split by comma but preserve commas within quotes
-                const columns = this.parseCSVRow(row);
-                console.log('Parsed columns:', columns);
-
-                if (columns.length >= 4) {
-                    const name = columns[0];
-                    // Handle the coordinate pairs which might be in "x,y" format
-                    const n1Coords = this.parseCoordinates(columns[1]);
-                    const n2Coords = this.parseCoordinates(columns[2]);
-                    const n3Coords = this.parseCoordinates(columns[3]);
-
-                    console.log('Parsed coordinates:', {
-                        name,
-                        n1: n1Coords,
-                        n2: n2Coords,
-                        n3: n3Coords
-                    });
-
-                    if (n1Coords && n2Coords && n3Coords) {
-                        presets[name] = {
-                            n1: { x: n1Coords[0], y: n1Coords[1] },
-                            n2: { x: n2Coords[0], y: n2Coords[1] },
-                            n3: { x: n3Coords[0], y: n3Coords[1] },
-                            timestamp: Date.now()
-                        };
-                        console.log('Successfully added preset:', name);
-                    } else {
-                        console.warn(`Invalid coordinates for row ${i}`);
-                    }
-                } else {
-                    console.warn(`Not enough columns in row ${i}:`, columns);
-                }
-            } catch (rowError) {
-                console.error(`Error processing row ${i}:`, rowError);
-            }
-        }
-
-        return presets;
-    }
-
-    parseCSVRow(row) {
-        const result = [];
-        let inQuotes = false;
-        let currentValue = '';
-        
-        for (let i = 0; i < row.length; i++) {
-            const char = row[i];
-            
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                result.push(currentValue.trim());
-                currentValue = '';
-            } else {
-                currentValue += char;
-            }
-        }
-        
-        // Push the last value
-        result.push(currentValue.trim());
-        
-        // Clean up quotes
-        return result.map(val => val.replace(/^"|"$/g, '').trim());
-    }
-
-    parseCoordinates(coordString) {
-        try {
-            // Remove any quotes and extra whitespace
-            coordString = coordString.replace(/"/g, '').trim();
-            
-            // Split on comma and parse as floats
-            const [x, y] = coordString.split(',').map(v => {
-                const parsed = parseFloat(v.trim());
-                if (isNaN(parsed)) {
-                    throw new Error(`Invalid coordinate value: ${v}`);
-                }
-                return parsed;
-            });
-
-            return [x, y];
-        } catch (error) {
-            console.warn('Error parsing coordinates:', coordString, error);
-            return null;
-        }
-    }
-}
 
 // Outside the class - DOM initialization
 document.addEventListener('DOMContentLoaded', () => {
