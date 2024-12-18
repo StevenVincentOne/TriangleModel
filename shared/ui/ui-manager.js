@@ -2,12 +2,6 @@ export class PresetManager {
     constructor(triangleSystem) {
         this.triangleSystem = triangleSystem;
         
-        // Remove any existing click handlers
-        const existingPresetItems = document.querySelectorAll('.dropdown-item[data-preset-name]');
-        existingPresetItems.forEach(item => {
-            item.removeEventListener('click', null);
-        });
-        
         // Initialize dropdowns
         this.userPresetsDropdown = document.getElementById('userPresetsDropdown');
         this.presetsList = document.getElementById('userPresetsList');
@@ -16,7 +10,125 @@ export class PresetManager {
         
         this.initializePresetsDropdown();
         this.initializeAnimationsDropdown();
+        this.setupAnimationControls();
         this.setupEventListeners();
+        this.setupSavePresetButton();
+    }
+    
+    setupAnimationControls() {
+        // Animation button handlers
+        const animateButtons = ['animate-button', 'animate-button-end'];
+        animateButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                // Remove any existing listeners
+                const newButton = button.cloneNode(true);
+                button.parentNode.replaceChild(newButton, button);
+                
+                newButton.addEventListener('click', () => {
+                    console.log('Animation button clicked');
+                    this.triangleSystem.startAnimation();
+                });
+            }
+        });
+
+        // Save animation button handlers
+        const saveAnimationButtons = ['save-animation', 'save-animation-end'];
+        saveAnimationButtons.forEach(buttonId => {
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.addEventListener('click', () => this.saveCurrentAnimation());
+            }
+        });
+    }
+    
+    getAnimationStates() {
+        return {
+            startState: {
+                nc1: parseFloat(document.getElementById('animation-nc1-start').value),
+                nc2: parseFloat(document.getElementById('animation-nc2-start').value),
+                nc3: parseFloat(document.getElementById('animation-nc3-start').value)
+            },
+            endState: {
+                nc1: parseFloat(document.getElementById('animation-nc1-end').value),
+                nc2: parseFloat(document.getElementById('animation-nc2-end').value),
+                nc3: parseFloat(document.getElementById('animation-nc3-end').value)
+            }
+        };
+    }
+    
+    saveCurrentAnimation() {
+        const name = prompt('Enter a name for this animation:');
+        if (!name) return;
+
+        try {
+            const { startState, endState } = this.getAnimationStates();
+            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+            
+            animations[name] = { start: startState, end: endState };
+            localStorage.setItem('userAnimations', JSON.stringify(animations));
+            
+            this.initializeAnimationsDropdown();
+            console.log(`Successfully saved animation "${name}"`);
+        } catch (error) {
+            console.error('Error saving animation:', error);
+            alert('Error saving animation. Please try again.');
+        }
+    }
+
+    loadAnimationPreset(name, values) {
+        try {
+            console.log('Loading animation preset:', name, values);
+            
+            // Update start fields
+            if (values.start) {
+                console.log('Updating start fields:', values.start);
+                ['nc1', 'nc2', 'nc3'].forEach(key => {
+                    const input = document.getElementById(`animation-${key}-start`);
+                    if (input) {
+                        input.value = Number(values.start[key]).toFixed(2);
+                    }
+                });
+            }
+
+            // Update end fields
+            if (values.end) {
+                console.log('Updating end fields:', values.end);
+                ['nc1', 'nc2', 'nc3'].forEach(key => {
+                    const input = document.getElementById(`animation-${key}-end`);
+                    if (input) {
+                        input.value = Number(values.end[key]).toFixed(2);
+                    }
+                });
+            }
+
+            // Update triangle to start position
+            if (values.start) {
+                this.triangleSystem.updateTriangleFromEdges(
+                    values.start.nc1,
+                    values.start.nc2,
+                    values.start.nc3
+                );
+            }
+
+            // Redraw and update
+            this.triangleSystem.drawSystem();
+            this.triangleSystem.updateDashboard();
+            
+            console.log('Successfully loaded animation preset');
+        } catch (error) {
+            console.error('Error loading animation preset:', error);
+            alert('Error loading animation preset');
+        }
+    }
+
+    updateAnimationFields(type, values) {
+        Object.entries(values).forEach(([key, value]) => {
+            const input = document.getElementById(`animation-${key}-${type}`);
+            if (input) {
+                input.value = Number(value).toFixed(2);
+            }
+        });
     }
 
     initializePresetsDropdown() {
@@ -88,74 +200,74 @@ export class PresetManager {
     }
 
     initializeAnimationsDropdown() {
-        if (!this.animationsDropdown || !this.animationsList) {
-            console.error('Animations dropdown elements not found');
+        if (!this.animationsList) {
+            console.error('Animations list element not found');
             return;
         }
 
-        // Clear existing items
-        this.animationsList.innerHTML = '';
+        try {
+            // Remove old event listeners
+            const oldItems = this.animationsList.querySelectorAll('.dropdown-item');
+            oldItems.forEach(item => {
+                item.replaceWith(item.cloneNode(true));
+            });
 
-        // Get saved animations and sort alphabetically
-        const savedAnimations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-        const sortedAnimations = Object.entries(savedAnimations)
-            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
-        
-        if (sortedAnimations.length > 0) {
-            sortedAnimations.forEach(([name, config]) => {
+            // Clear existing items
+            this.animationsList.innerHTML = '';
+            
+            // Get saved animations from localStorage
+            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+            console.log('Available animations:', animations);
+            
+            // Sort animation names alphabetically
+            const sortedNames = Object.keys(animations).sort();
+            
+            // Add each animation to the dropdown
+            sortedNames.forEach(name => {
                 const li = document.createElement('li');
                 const a = document.createElement('a');
                 a.className = 'dropdown-item';
                 a.href = '#';
                 
-                // Create container for name and buttons
-                const container = document.createElement('div');
-                container.className = 'preset-item-container';
+                // Create span for the text content
+                const textSpan = document.createElement('span');
+                textSpan.textContent = name;
                 
-                // Add animation name
-                const nameSpan = document.createElement('span');
-                nameSpan.className = 'preset-name';
-                nameSpan.textContent = name;
-                container.appendChild(nameSpan);
+                // Create button container
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'preset-buttons';
                 
-                // Add edit button
-                const editBtn = document.createElement('button');
-                editBtn.className = 'edit-btn';
-                editBtn.innerHTML = '✎';
-                editBtn.onclick = (e) => {
-                    e.stopPropagation();
-                    this.editAnimation(name, config);
-                };
-                container.appendChild(editBtn);
-                
-                // Add delete button
+                // Create delete button
                 const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-btn';
-                deleteBtn.innerHTML = '×';
+                deleteBtn.className = 'delete-button small-button';
+                deleteBtn.textContent = '×';
                 deleteBtn.onclick = (e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     this.deleteAnimation(name);
                 };
-                container.appendChild(deleteBtn);
-                
-                a.appendChild(container);
-                li.appendChild(a);
-                this.animationsList.appendChild(li);
                 
                 // Add click handler for loading animation
                 a.onclick = (e) => {
                     e.preventDefault();
-                    this.playAnimation(name, config);
+                    e.stopPropagation();
+                    console.log('Animation selected:', name);
+                    const animationData = animations[name];
+                    console.log('Animation data:', animationData);
+                    this.loadAnimationPreset(name, animationData);
                 };
+                
+                // Assemble the dropdown item
+                buttonContainer.appendChild(deleteBtn);
+                a.appendChild(textSpan);
+                a.appendChild(buttonContainer);
+                li.appendChild(a);
+                this.animationsList.appendChild(li);
             });
-        } else {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.className = 'dropdown-item disabled';
-            a.href = '#';
-            a.textContent = 'No saved animations';
-            li.appendChild(a);
-            this.animationsList.appendChild(li);
+
+            console.log('Animations dropdown initialized with', sortedNames.length, 'items');
+        } catch (error) {
+            console.error('Error initializing animations dropdown:', error);
         }
     }
 
@@ -375,6 +487,170 @@ export class PresetManager {
             } catch (error) {
                 console.error('Error deleting preset:', error);
                 alert('Error deleting preset. Please try again.');
+            }
+        }
+    }
+
+    saveCurrentConfig(system) {
+        // Get current NC values
+        const nc1 = document.getElementById('manual-nc1')?.value;
+        const nc2 = document.getElementById('manual-nc2')?.value;
+        const nc3 = document.getElementById('manual-nc3')?.value;
+        
+        // Validate values
+        if (!nc1 || !nc2 || !nc3) {
+            alert('Please enter all NC values before saving a preset.');
+            return;
+        }
+
+        // Get current triangle configuration
+        const config = {
+            n1: { x: system.n1.x, y: system.n1.y },
+            n2: { x: system.n2.x, y: system.n2.y },
+            n3: { x: system.n3.x, y: system.n3.y },
+            nc1: parseFloat(nc1),
+            nc2: parseFloat(nc2),
+            nc3: parseFloat(nc3),
+            timestamp: Date.now()
+        };
+
+        // Single prompt for preset name
+        const name = prompt('Enter a name for this preset:');
+        
+        if (name) {
+            try {
+                // Get existing presets
+                const existingPresets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+                
+                // Add new preset
+                existingPresets[name] = config;
+                
+                // Save to localStorage
+                localStorage.setItem('userPresets', JSON.stringify(existingPresets));
+                
+                // Update dropdown immediately
+                this.updatePresetsDropdown();
+                
+                alert('Preset saved successfully!');
+            } catch (error) {
+                console.error('Error saving preset:', error);
+                alert('Error saving preset. Please try again.');
+            }
+        }
+    }
+
+    setupSavePresetButton() {
+        // Try both possible button IDs
+        const savePresetButton = document.getElementById('save-preset') || document.getElementById('savePreset');
+        if (savePresetButton) {
+            console.log('Found save preset button');
+            // Remove any existing listeners
+            const newButton = savePresetButton.cloneNode(true);
+            savePresetButton.parentNode.replaceChild(newButton, savePresetButton);
+            
+            newButton.addEventListener('click', () => {
+                console.log('Save preset button clicked');
+                this.saveCurrentPreset();
+            });
+        } else {
+            console.error('Save preset button not found');
+        }
+    }
+
+    saveCurrentPreset() {
+        try {
+            console.log('Saving current preset...');
+            const name = prompt('Enter a name for this preset:');
+            if (!name) return;
+
+            // Get current triangle state
+            const currentState = {
+                n1: { ...this.triangleSystem.system.n1 },
+                n2: { ...this.triangleSystem.system.n2 },
+                n3: { ...this.triangleSystem.system.n3 }
+            };
+            console.log('Current state to save:', currentState);
+
+            // Get existing presets
+            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+            
+            // Save new preset
+            presets[name] = currentState;
+            localStorage.setItem('userPresets', JSON.stringify(presets));
+
+            // Update dropdown
+            this.initializePresetsDropdown();
+
+            console.log('Successfully saved preset:', name);
+        } catch (error) {
+            console.error('Error saving preset:', error);
+            alert('Error saving preset. Please try again.');
+        }
+    }
+
+    initializePresetsDropdown() {
+        if (!this.presetsList) {
+            console.error('Presets list element not found');
+            return;
+        }
+
+        try {
+            // Clear existing items
+            this.presetsList.innerHTML = '';
+            
+            // Get saved presets
+            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+            const sortedNames = Object.keys(presets).sort();
+            
+            sortedNames.forEach(name => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = 'dropdown-item';
+                a.href = '#';
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = name;
+                
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'preset-buttons';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-button small-button';
+                deleteBtn.textContent = '×';
+                deleteBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.deletePreset(name);
+                };
+                
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Loading preset:', name);
+                    this.loadPreset(name, presets[name]);
+                };
+                
+                buttonContainer.appendChild(deleteBtn);
+                a.appendChild(textSpan);
+                a.appendChild(buttonContainer);
+                li.appendChild(a);
+                this.presetsList.appendChild(li);
+            });
+        } catch (error) {
+            console.error('Error initializing presets dropdown:', error);
+        }
+    }
+
+    deletePreset(name) {
+        if (confirm(`Delete preset "${name}"?`)) {
+            try {
+                const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+                delete presets[name];
+                localStorage.setItem('userPresets', JSON.stringify(presets));
+                this.initializePresetsDropdown();
+            } catch (error) {
+                console.error('Error deleting preset:', error);
+                alert('Error deleting preset');
             }
         }
     }

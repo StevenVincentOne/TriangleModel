@@ -56,7 +56,6 @@ export class TriangleSystem {
             const titleText = manualTitle.textContent;   
             
         }
-
         // Initialize storage for user animations
         this.userAnimations = JSON.parse(localStorage.getItem('userAnimations')) || {};
         
@@ -100,9 +99,6 @@ export class TriangleSystem {
 
         // Initialize subsystem metrics
         this.subsystemAreas = [0, 0, 0];  // Initialize array for three subsystems
-        
-        // Bind save preset handler
-        document.getElementById('save-preset').addEventListener('click', () => this.saveCurrentConfig());
 
         // Initialize database
         this.db = new TriangleDatabase();
@@ -163,190 +159,11 @@ export class TriangleSystem {
         // Initialize managers
         this.importManager = new ImportManager(this);
 
-        // Initialize animations list with delete handlers that use PresetManager
-        const animationsList = document.getElementById('animationsList');
-        if (animationsList) {
-            animationsList.addEventListener('click', (e) => {
-                const deleteBtn = e.target.closest('.delete-button');
-                if (deleteBtn) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const item = deleteBtn.closest('.dropdown-item');
-                    const name = item.getAttribute('data-preset-name');
-                    if (name) {
-                        this.presetManager.deleteAnimation(name);
-                    }
-                }
-            });
-        }
-
-        // Simple event listener for save button
-        const saveButton = document.getElementById('save-preset');
-        if (saveButton) {
-            saveButton.addEventListener('click', () => {
-                this.presetManager.saveCurrentConfig(this.system);
-            });
-        }
     }  // End of constructor
-
-    initializePresets() {
-        // Initialize storage if it doesn't exist
-        if (!localStorage.getItem('userPresets')) {
-            localStorage.setItem('userPresets', JSON.stringify({}));
-        }
-        
-        // Update presets dropdown
-        this.updatePresetsDropdown();
-    }
-    
-    // Separate method for initializing both dropdowns
-    initializeDropdowns() {
-        // Initialize both dropdowns
-        this.initializePresets();
-        this.initializeAnimations();
-        
-        // Update animations dropdown
-        this.updateAnimationsDropdown();
-    }
-
-    savePreset() {
-        // Get current NC values
-        const nc1 = document.getElementById('manual-nc1').value;
-        const nc2 = document.getElementById('manual-nc2').value;
-        const nc3 = document.getElementById('manual-nc3').value;
-
-        // Validate values
-        if (!nc1 || !nc2 || !nc3) {
-            alert('Please enter all NC values before saving a preset.');
-            return;
-        }
-
-        // Prompt for preset name
-        const presetName = prompt('Enter a name for this preset:');
-        if (!presetName) return; // User cancelled
-
-        try {
-            // Get existing presets
-            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-            
-            // Add new preset
-            presets[presetName] = {
-                nc1: parseFloat(nc1),
-                nc2: parseFloat(nc2),
-                nc3: parseFloat(nc3),
-                timestamp: Date.now() // Add timestamp for sorting
-            };
-            
-            // Save back to localStorage
-            localStorage.setItem('userPresets', JSON.stringify(presets));
-            
-            // Update dropdown
-            this.updatePresetsDropdown();
-            
-            console.log(`Saved preset: ${presetName}`, presets[presetName]); // Debug log
-            alert('Preset saved successfully!');
-        } catch (error) {
-            console.error('Error saving preset:', error);
-            alert('Error saving preset. Please try again.');
-        }
-    }
-
-    updatePresetsDropdown() {
-        const presetsList = document.getElementById('userPresetsList');
-        if (!presetsList) {
-            console.error('Presets list element not found');
-            return;
-        }
-        
-        try {
-            // Clear existing items
-            presetsList.innerHTML = '';
-            
-            // Get presets from storage and log them
-            const presetsString = localStorage.getItem('userPresets');
-            console.log('Raw presets from storage:', presetsString);
-            
-            const presets = JSON.parse(presetsString || '{}');
-            console.log('Parsed presets:', presets);
-            
-            // Sort presets alphabetically by name (case-insensitive)
-            const sortedPresets = Object.entries(presets)
-                .sort(([nameA], [nameB]) => nameA.toLowerCase().localeCompare(nameB.toLowerCase()));
-            console.log('Sorted presets:', sortedPresets);
-            
-            // Add presets to dropdown
-            sortedPresets.forEach(([name, values]) => {
-                console.log(`Creating dropdown item for preset: ${name}`, values);
-                
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.className = 'dropdown-item';
-                a.href = '#';
-                
-                // Create span for the text content
-                const textSpan = document.createElement('span');
-                const ncValues = `(${values.nc1}, ${values.nc2}, ${values.nc3})`;
-                textSpan.textContent = `${name} ${ncValues}`;
-                
-                // Create button container for edit and delete
-                const buttonContainer = document.createElement('div');
-                buttonContainer.className = 'preset-buttons';
-                
-                // Create edit button
-                const editBtn = document.createElement('button');
-                editBtn.className = 'edit-button small-button';
-                editBtn.textContent = '✎';
-                editBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const newName = prompt('Enter new name for preset:', name);
-                    if (newName && newName !== name) {
-                        this.renamePreset(name, newName, values);
-                    }
-                });
-                
-                // Create delete button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-button small-button';
-                deleteBtn.textContent = '×';
-                deleteBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    this.deletePreset(name);
-                });
-                
-                // Append buttons to container
-                buttonContainer.appendChild(editBtn);
-                buttonContainer.appendChild(deleteBtn);
-                
-                // Append in correct order
-                a.appendChild(textSpan);
-                a.appendChild(buttonContainer);
-                li.appendChild(a);
-                presetsList.appendChild(li);
-                
-                // Add click handler for loading preset
-                a.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.loadPreset(name, values);
-                });
-            });
-            
-            console.log('Updated presets dropdown with', Object.keys(presets).length, 'items');
-            console.log('Final dropdown HTML:', presetsList.innerHTML);
-        } catch (error) {
-            console.error('Detailed error in updatePresetsDropdown:', {
-                error,
-                message: error.message,
-                stack: error.stack
-            });
-        }
-    }
 
     loadPreset(name, values) {
         try {
             
-
             // 1. Validate input values
             if (!values || typeof values !== 'object') {
                 throw new Error('Invalid preset values');
@@ -469,18 +286,7 @@ export class TriangleSystem {
         this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
         this.canvas.addEventListener('mouseleave', (e) => this.onMouseUp(e));
 
-        // Add Save button listener with debug logs
-        console.log('Setting up Save button listener');
-        const saveButton = document.getElementById('save-preset');
-        if (saveButton) {
-            
-            saveButton.addEventListener('click', () => {
-                console.log('Save button clicked');
-                this.saveCurrentConfig();
-            });
-        } else {
-            console.error('Save button not found');
-        }
+       
 
         // Add Preset Dropdown Functionality
         const presetDropdown = document.getElementById('userPresetsList');
@@ -489,6 +295,7 @@ export class TriangleSystem {
         if (presetDropdown && dropdownButton) {
             // Load saved presets from localStorage
             const savedPresets = JSON.parse(localStorage.getItem('userPresets')) || {};
+            
             
             
             // Clear existing items
@@ -2825,8 +2632,7 @@ export class TriangleSystem {
         // Update rendering and dashboard
         this.drawSystem();
         this.updateDashboard();
-        // Remove this line to prevent automatic animation field updates
-        // this.updateAnimationFields();  
+        // Remove this line to prevent automatic animation field updates  
     }
 
     centerTriangle() {
@@ -2976,101 +2782,11 @@ export class TriangleSystem {
         });
     }
 
-    initializeUserPresets() {
-        console.log('Initializing user presets dropdown');
-        const userPresetsList = document.getElementById('userPresetsList');
-        
-        if (!userPresetsList) {
-            console.error('User presets list element not found');
-            return;
-        }
-        
-        // Clear existing items
-        userPresetsList.innerHTML = '';
-        
-        // Add each saved preset
-        Object.entries(this.userPresets).forEach(([name, config]) => {
-            const item = document.createElement('li');
-            const link = document.createElement('a');
-            link.className = 'dropdown-item';
-            link.href = '#';
-            link.textContent = name;
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.loadUserPreset(name);
-            });
-            item.appendChild(link);
-            userPresetsList.appendChild(item);
-        });
-    }
+    
 
-    loadUserPreset(name) {
-        const config = this.userPresets[name];
-        if (config) {
-            // Load the configuration
-            this.system.n1.x = config.n1.x;
-            this.system.n1.y = config.n1.y;
-            this.system.n2.x = config.n2.x;
-            this.system.n2.y = config.n2.y;
-            this.system.n3.x = config.n3.x;
-            this.system.n3.y = config.n3.y;
+    
 
-            // Update display
-            this.drawSystem();
-            this.updateDashboard();
-        }
-    }
-
-    saveCurrentConfig() {
-        
-        // Get current NC values
-        const nc1 = document.getElementById('manual-nc1')?.value;
-        const nc2 = document.getElementById('manual-nc2')?.value;
-        const nc3 = document.getElementById('manual-nc3')?.value;
-        
-        // Validate values
-        if (!nc1 || !nc2 || !nc3) {
-            alert('Please enter all NC values before saving a preset.');
-            return;
-        }
-
-        // Get current triangle configuration
-        const config = {
-            n1: { x: this.system.n1.x, y: this.system.n1.y },
-            n2: { x: this.system.n2.x, y: this.system.n2.y },
-            n3: { x: this.system.n3.x, y: this.system.n3.y },
-            nc1: parseFloat(nc1),
-            nc2: parseFloat(nc2),
-            nc3: parseFloat(nc3),
-            timestamp: Date.now()
-        };
-
-        // Single prompt for preset name
-        const name = prompt('Enter a name for this preset:');
-        
-        if (name) {
-            try {
-                // Get existing presets
-                const existingPresets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-                
-                // Add new preset
-                existingPresets[name] = config;
-                
-                // Save to localStorage
-                localStorage.setItem('userPresets', JSON.stringify(existingPresets));
-                
-                // Update dropdown immediately
-                this.updatePresetsDropdown();
-                
-                alert('Preset saved successfully!');
-
-            } catch (error) {
-                console.error('Error saving preset:', error);
-                alert('Error saving preset. Please try again.');
-            }
-        
-        }
-    }
+    
 
     checkInputFields() {
         const inputFields = document.querySelectorAll('input[type="text"]:not(.manual-input):not([readonly="false"])');
@@ -3079,43 +2795,7 @@ export class TriangleSystem {
         });
     }
 
-    saveCurrentAnimation() {
-        try {
-            const name = prompt('Enter a name for this animation:');
-            if (!name) return;
-
-            // Get start values from start input fields
-            const startState = {
-                nc1: parseFloat(document.getElementById('animation-nc1-start').value),
-                nc2: parseFloat(document.getElementById('animation-nc2-start').value),
-                nc3: parseFloat(document.getElementById('animation-nc3-start').value)
-            };
-
-            // Get end values from end input fields
-            const endState = {
-                nc1: parseFloat(document.getElementById('animation-nc1-end').value),
-                nc2: parseFloat(document.getElementById('animation-nc2-end').value),
-                nc3: parseFloat(document.getElementById('animation-nc3-end').value)
-            };
-
-            // Create animation data
-            const animationData = {
-                start: startState,
-                end: endState
-            };
-
-            // Save to localStorage
-            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-            animations[name] = animationData;
-            localStorage.setItem('userAnimations', JSON.stringify(animations));
-
-            this.initializeAnimations();
-            console.log(`Successfully saved animation "${name}"`, animationData);
-        } catch (error) {
-            console.error('Error saving animation:', error);
-            alert('Error saving animation. Please try again.');
-        }
-    }
+    
 
     // Add new method to initialize animations dropdown
     initializeUserAnimations() {
@@ -3156,39 +2836,7 @@ export class TriangleSystem {
         });
     }
 
-    // Add this method if it doesn't exist, or update it if it does
-    updateAnimationFields() {
-        // Get current lengths
-        const currentLengths = this.calculateLengths();
-
-        // Update Animation Start fields
-        const startNc1Input = document.getElementById('animation-nc1-start');
-        const startNc2Input = document.getElementById('animation-nc2-start');
-        const startNc3Input = document.getElementById('animation-nc3-start');
-
-        if (startNc1Input && startNc2Input && startNc3Input) {
-            startNc1Input.value = currentLengths.l1.toFixed(2);
-            startNc2Input.value = currentLengths.l2.toFixed(2);
-            startNc3Input.value = currentLengths.l3.toFixed(2);
-            
-        } else {
-            console.error('Some animation start input fields not found');
-        }
-
-        // Update Animation End fields
-        const endNc1Input = document.getElementById('animation-nc1-end');
-        const endNc2Input = document.getElementById('animation-nc2-end');
-        const endNc3Input = document.getElementById('animation-nc3-end');
-
-        if (endNc1Input && endNc2Input && endNc3Input) {
-            endNc1Input.value = currentLengths.l1.toFixed(2);
-            endNc2Input.value = currentLengths.l2.toFixed(2);
-            endNc3Input.value = currentLengths.l3.toFixed(2);
-            console.log('Updated end fields');
-        } else {
-            console.error('Some animation end input fields not found');
-        }
-    }
+    
 
     // Add new method for image export
     exportToImage() {
@@ -3613,301 +3261,88 @@ export class TriangleSystem {
             return null;
         }
     }
-
-    renamePreset(oldName, newName, values) {
-        try {
-            // Get existing presets
-            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-            
-            // Delete old name and add with new name
-            delete presets[oldName];
-            presets[newName] = values;
-            
-            // Save back to localStorage
-            localStorage.setItem('userPresets', JSON.stringify(presets));
-            
-            // Update dropdown
-            this.updatePresetsDropdown();
-            
-            console.log(`Renamed preset from "${oldName}" to "${newName}"`);
-        } catch (error) {
-            console.error('Error renaming preset:', error);
-            alert('Error renaming preset. Please try again.');
-        }
-    }
-
-    updateAnimationsDropdown() {
-        const animationsList = document.getElementById('animationsList');
-        if (!animationsList) {
-            console.error('Animations list element not found');
-            return;
-        }
-        
-        try {
-            // Clear existing items
-            animationsList.innerHTML = '';
-            
-            // Get animations from storage
-            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-            
-            // Sort animations alphabetically by name (case-insensitive)
-            const sortedAnimations = Object.entries(animations)
-                .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
-            
-            if (sortedAnimations.length > 0) {
-                sortedAnimations.forEach(([name, config]) => {
-                    const li = document.createElement('li');
-                    const a = document.createElement('a');
-                    a.className = 'dropdown-item';
-                    a.href = '#';
-                    
-                    // Create container for name and buttons
-                    const container = document.createElement('div');
-                    container.className = 'preset-item-container';
-                    
-                    // Add animation name
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'preset-name';
-                    nameSpan.textContent = name;
-                    container.appendChild(nameSpan);
-                    
-                    // Add edit button
-                    const editBtn = document.createElement('button');
-                    editBtn.className = 'edit-btn';
-                    editBtn.innerHTML = '✎';
-                    editBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        this.editAnimation(name, config);
-                    };
-                    container.appendChild(editBtn);
-                    
-                    // Add delete button
-                    const deleteBtn = document.createElement('button');
-                    deleteBtn.className = 'delete-btn';
-                    deleteBtn.innerHTML = '×';
-                    deleteBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        this.deleteAnimation(name);
-                    };
-                    container.appendChild(deleteBtn);
-                    
-                    a.appendChild(container);
-                    li.appendChild(a);
-                    this.animationsList.appendChild(li);
-                    
-                    // Add click handler for loading animation
-                    a.onclick = (e) => {
-                        e.preventDefault();
-                        this.playAnimation(name, config);
-                    };
-                });
-            } else {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.className = 'dropdown-item disabled';
-                a.href = '#';
-                a.textContent = 'No saved animations';
-                li.appendChild(a);
-                this.animationsList.appendChild(li);
-            }
-            
-        } catch (error) {
-            console.error('Error updating animations dropdown:', error);
-        }
-    }
-
-    // Add these new methods to handle editing and deleting animations
-    editAnimation(name, config) {
-        const newName = prompt('Enter new name for animation:', name);
-        if (newName && newName !== name) {
-            try {
-                // Get current animations
-                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-                
-                // Delete old name and add with new name
-                delete animations[name];
-                animations[newName] = config;
-                
-                // Save back to storage
-                localStorage.setItem('userAnimations', JSON.stringify(animations));
-                
-                // Refresh dropdown
-                this.initializeAnimationsDropdown();
-                
-                console.log('Animation renamed:', name, 'to', newName);
-            } catch (error) {
-                console.error('Error editing animation:', error);
-                alert('Error editing animation. Please try again.');
-            }
-        }
-    }
-
-    deleteAnimation(name) {
-        if (confirm(`Are you sure you want to delete the animation "${name}"?`)) {
-            try {
-                // Get current animations
-                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-                
-                // Delete the animation
-                delete animations[name];
-                
-                // Save back to storage
-                localStorage.setItem('userAnimations', JSON.stringify(animations));
-                
-                // Refresh dropdown
-                this.initializeAnimationsDropdown();
-                
-                console.log('Animation deleted:', name);
-            } catch (error) {
-                console.error('Error deleting animation:', error);
-                alert('Error deleting animation. Please try again.');
-            }
-        }
-    }
-
     // Add or update the startAnimation method
     startAnimation() {
+        console.log('startAnimation called, current state:', { 
+            isAnimating: this.isAnimating, 
+            hasLoop: !!this.animationLoop 
+        });
+
+        // If already animating, stop the animation
+        if (this.isAnimating) {
+            console.log('Stopping existing animation');
+            this.stopAnimation();
+            return;
+        }
+
         try {
-            // Get start values from input fields
-            const startState = {
-                nc1: parseFloat(document.getElementById('animation-nc1-start').value),
-                nc2: parseFloat(document.getElementById('animation-nc2-start').value),
-                nc3: parseFloat(document.getElementById('animation-nc3-start').value)
-            };
+            const { startState, endState } = this.presetManager.getAnimationStates();
+            console.log('Animation values:', { startState, endState });
 
-            // Get end values from input fields
-            const endState = {
-                nc1: parseFloat(document.getElementById('animation-nc1-end').value),
-                nc2: parseFloat(document.getElementById('animation-nc2-end').value),
-                nc3: parseFloat(document.getElementById('animation-nc3-end').value)
-            };
-
-            // Check if animation is already running
-            if (this.isAnimating) {
-                this.isAnimating = false;
-                return;
-            }
-
-            // First reset to start position
+            // Reset to start position
             this.updateTriangleFromEdges(startState.nc1, startState.nc2, startState.nc3);
             
             // Animation parameters
-            const duration = 4000; // 4 seconds
-            let startTime = performance.now(); // Changed to let
+            const duration = 4000;
+            let startTime = null;
             let forward = true;
             this.isAnimating = true;
 
-            // Animation function
             const animate = (currentTime) => {
-                if (!this.isAnimating) return;
+                if (!this.isAnimating) {
+                    console.log('Animation stopped');
+                    return;
+                }
+
+                if (startTime === null) {
+                    startTime = currentTime;
+                }
 
                 const elapsed = currentTime - startTime;
                 let progress = (elapsed % duration) / duration;
                 const loopCheckbox = document.getElementById('animation-loop');
                 const isLooping = loopCheckbox?.checked;
 
-                // Handle single play vs loop
                 if (!isLooping && elapsed >= duration) {
-                    // For single play, stop at end state
+                    console.log('Animation complete');
                     this.updateTriangleFromEdges(endState.nc1, endState.nc2, endState.nc3);
-                    this.isAnimating = false;
+                    this.stopAnimation();
                     return;
                 } else if (isLooping && elapsed >= duration) {
-                    // For loop, reverse direction and reset start time
-                    forward = !forward; // Simplified direction toggle
-                    startTime = currentTime; // Reset start time for next loop
-                    progress = 0; // Reset progress
+                    forward = !forward;
+                    startTime = currentTime;
+                    progress = 0;
                 }
 
                 const effectiveProgress = forward ? progress : 1 - progress;
-
-                // Calculate current values
                 const current = {
                     nc1: startState.nc1 + (endState.nc1 - startState.nc1) * effectiveProgress,
                     nc2: startState.nc2 + (endState.nc2 - startState.nc2) * effectiveProgress,
                     nc3: startState.nc3 + (endState.nc3 - startState.nc3) * effectiveProgress
                 };
 
-                // Update triangle with current values
                 this.updateTriangleFromEdges(current.nc1, current.nc2, current.nc3);
-                
-                // Continue animation
-                if (this.isAnimating) {
-                    requestAnimationFrame(animate);
-                }
+                this.animationLoop = requestAnimationFrame(animate);
             };
 
-            // Start animation
-            requestAnimationFrame(animate);
+            this.animationLoop = requestAnimationFrame(animate);
+            console.log('Animation started');
 
         } catch (error) {
             console.error('Error in startAnimation:', error);
-            this.isAnimating = false;
+            this.stopAnimation();
         }
     }
 
-    loadAnimationPreset(name, values) {
-        try {
-            console.log('Loading animation preset:', name);
-            console.log('Values received:', values);
-            
-            // First update end fields if they exist in the preset
-            if (values.end) {
-                console.log('Setting end values:', values.end);
-                const endFields = {
-                    'animation-nc1-end': values.end.nc1,
-                    'animation-nc2-end': values.end.nc2,
-                    'animation-nc3-end': values.end.nc3
-                };
-
-                Object.entries(endFields).forEach(([id, value]) => {
-                    const input = document.getElementById(id);
-                    if (input) {
-                        input.value = Number(value).toFixed(2);
-                        console.log(`Set ${id} to ${input.value}`);
-                    }
-                });
-            }
-            
-            // Then update start fields and triangle position
-            if (values.start) {
-                console.log('Setting start values:', values.start);
-                
-                // Update start input fields
-                const startFields = {
-                    'animation-nc1-start': values.start.nc1,
-                    'animation-nc2-start': values.start.nc2,
-                    'animation-nc3-start': values.start.nc3
-                };
-
-                Object.entries(startFields).forEach(([id, value]) => {
-                    const input = document.getElementById(id);
-                    if (input) {
-                        input.value = Number(value).toFixed(2);
-                        console.log(`Set ${id} to ${input.value}`);
-                    }
-                });
-
-                // Update the current triangle to match start state
-                console.log('Updating triangle with start values:', values.start);
-                this.updateTriangleFromEdges(
-                    values.start.nc1,
-                    values.start.nc2,
-                    values.start.nc3
-                );
-            }
-            
-            // Redraw and update
-            this.drawSystem();
-            this.updateDashboard();
-            
-            console.log('Successfully loaded animation preset');
-        } catch (error) {
-            console.error('Error loading animation preset:', error);
-            console.error('Error details:', error.message);
-            alert('Error loading animation preset. Please check the console for details.');
+    stopAnimation() {
+        this.isAnimating = false;
+        if (this.animationLoop) {
+            cancelAnimationFrame(this.animationLoop);
+            this.animationLoop = null;
         }
     }
+
+    
 
     // Add this method to update triangle dimensions
     updateTriangle(nc1, nc2, nc3) {
@@ -3934,50 +3369,7 @@ export class TriangleSystem {
         }
     }
 
-    saveAnimation(name) {
-        try {
-            // Get start values from current triangle state
-            const startValues = {
-                nc1: this.calculateDistance(this.system.n1, this.system.n3),
-                nc2: this.calculateDistance(this.system.n1, this.system.n2),
-                nc3: this.calculateDistance(this.system.n2, this.system.n3)
-            };
-
-            // Get end values from inputs
-            const endValues = {
-                nc1: parseFloat(document.getElementById('animation-nc1-end').value),
-                nc2: parseFloat(document.getElementById('animation-nc2-end').value),
-                nc3: parseFloat(document.getElementById('animation-nc3-end').value)
-            };
-
-            // Log the values being saved
-            console.log('Saving animation with values:', {
-                name,
-                start: startValues,
-                end: endValues
-            });
-
-            // Get existing animations
-            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-            
-            // Save both start and end values
-            animations[name] = {
-                start: startValues,
-                end: endValues
-            };
-            
-            // Save to localStorage
-            localStorage.setItem('userAnimations', JSON.stringify(animations));
-            
-            // Update dropdown
-            this.updateAnimationsDropdown();
-            
-            console.log('Successfully saved animation:', name);
-        } catch (error) {
-            console.error('Error saving animation:', error);
-            alert('Error saving animation. Please try again.');
-        }
-    }
+    
 
     drawSubtriangle(ctx) {
         if (!this.showSubtriangle) return;
@@ -5043,73 +4435,7 @@ export class TriangleSystem {
         this.drawTextWithShadow(ctx, length.toFixed(2), x, y, '10px');
     }
 
-    // Add this method to handle the loop animation
-    startLoopAnimation() {
-        if (this.isAnimating) {
-            this.isAnimating = false;
-            if (this.animationLoop) {
-                cancelAnimationFrame(this.animationLoop);
-                this.animationLoop = null;
-            }
-            return;
-        }
-
-        const startState = {
-            nc1: parseFloat(document.getElementById('animation-nc1-start').value),
-            nc2: parseFloat(document.getElementById('animation-nc2-start').value),
-            nc3: parseFloat(document.getElementById('animation-nc3-start').value)
-        };
-
-        const endState = {
-            nc1: parseFloat(document.getElementById('animation-nc1-end').value),
-            nc2: parseFloat(document.getElementById('animation-nc2-end').value),
-            nc3: parseFloat(document.getElementById('animation-nc3-end').value)
-        };
-
-        this.isAnimating = true;
-        const duration = 4000;
-        let startTime = performance.now();
-        let forward = true;
-
-        const animate = (currentTime) => {
-            if (!this.isAnimating) return;
-
-            const elapsed = currentTime - startTime;
-            let progress = (elapsed % duration) / duration;
-            const loopCheckbox = document.getElementById('animation-loop');
-            const isLooping = loopCheckbox?.checked;
-
-            // Handle single play vs loop
-            if (!isLooping && elapsed >= duration) {
-                // For single play, stop at end state
-                this.updateTriangleFromEdges(endState.nc1, endState.nc2, endState.nc3);
-                this.isAnimating = false;
-                return;
-            } else if (isLooping && elapsed >= duration) {
-                // For loop, reverse direction and reset start time
-                forward = !forward; // Simplified direction toggle
-                startTime = currentTime; // Reset start time for next loop
-                progress = 0; // Reset progress
-            }
-
-            const effectiveProgress = forward ? progress : 1 - progress;
-
-            // Calculate current values
-            const current = {
-                nc1: startState.nc1 + (endState.nc1 - startState.nc1) * effectiveProgress,
-                nc2: startState.nc2 + (endState.nc2 - startState.nc2) * effectiveProgress,
-                nc3: startState.nc3 + (endState.nc3 - startState.nc3) * effectiveProgress
-            };
-
-            // Update triangle
-            this.updateTriangleFromEdges(current.nc1, current.nc2, current.nc3);
-            
-            // Continue loop
-            this.animationLoop = requestAnimationFrame(animate);
-        };
-
-        this.animationLoop = requestAnimationFrame(animate);
-    }
+    
 
     drawICLines(ctx) {
         if (!this.system.n1 || !this.system.n2 || !this.system.n3) return;
@@ -5666,26 +4992,23 @@ export class TriangleSystem {
         }
     }
 
-    deletePreset(name) {
-        if (!confirm(`Are you sure you want to delete the preset "${name}"?`)) return;
-
-        try {
-            // Get existing presets
-            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-            
-            // Delete preset
-            delete presets[name];
-            
-            // Save back to localStorage
-            localStorage.setItem('userPresets', JSON.stringify(presets));
-            
-            // Update dropdown
-            this.updatePresetsDropdown();
-            
-        } catch (error) {
-            console.error('Error deleting preset:', error);
-            alert('Error deleting preset. Please try again.');
-        }
+    calculateCurrentState(start, end, progress) {
+        return {
+            nc1: start.nc1 + (end.nc1 - start.nc1) * progress,
+            nc2: start.nc2 + (end.nc2 - start.nc2) * progress,
+            nc3: start.nc3 + (end.nc3 - start.nc3) * progress
+        };
+    }
+    
+    getAnimationValues() {
+        // Get current triangle state values
+        return {
+            start: {
+                nc1: this.calculateDistance(this.system.n1, this.system.n3),
+                nc2: this.calculateDistance(this.system.n1, this.system.n2),
+                nc3: this.calculateDistance(this.system.n2, this.system.n3)
+            }
+        };
     }
 }
 
