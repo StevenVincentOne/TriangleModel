@@ -1,6 +1,8 @@
 export class PresetManager {
     constructor(triangleSystem) {
         this.triangleSystem = triangleSystem;
+        this.isAnimating = false;
+        this.animationLoop = null;
         
         // Initialize dropdowns
         this.userPresetsDropdown = document.getElementById('userPresetsDropdown');
@@ -132,71 +134,64 @@ export class PresetManager {
     }
 
     initializePresetsDropdown() {
-        if (!this.userPresetsDropdown || !this.presetsList) {
-            console.error('Presets dropdown elements not found');
+        if (!this.presetsList) {
+            console.error('Presets list element not found');
             return;
         }
 
-        // Remove old event listeners
-        const oldItems = this.presetsList.querySelectorAll('.dropdown-item');
-        oldItems.forEach(item => {
-            item.replaceWith(item.cloneNode(true));
-        });
-
-        // Get presets from storage and convert to sorted array
-        const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
-        const sortedPresets = Object.entries(presets)
-            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
-        
-        // Clear and populate dropdown
-        this.presetsList.innerHTML = '';
-        
-        sortedPresets.forEach(([name, values]) => {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.className = 'dropdown-item';
-            a.href = '#';
+        try {
+            this.presetsList.innerHTML = '';
+            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+            const sortedNames = Object.keys(presets).sort();
             
-            // Create container for name and buttons
-            const container = document.createElement('div');
-            container.className = 'preset-item-container';
-            
-            // Add preset name
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'preset-name';
-            nameSpan.textContent = name;
-            container.appendChild(nameSpan);
-            
-            // Add edit button
-            const editBtn = document.createElement('button');
-            editBtn.className = 'edit-btn';
-            editBtn.innerHTML = '✎';
-            editBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.editPreset(name, values);
-            };
-            container.appendChild(editBtn);
-            
-            // Add delete button
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete-btn';
-            deleteBtn.innerHTML = '×';
-            deleteBtn.onclick = (e) => {
-                e.stopPropagation();
-                this.deletePreset(name);
-            };
-            container.appendChild(deleteBtn);
-            
-            a.appendChild(container);
-            li.appendChild(a);
-            this.presetsList.appendChild(li);
-            
-            // Add click handler for loading preset
-            a.onclick = (e) => {
-                e.preventDefault();
-                this.loadPreset(name, values);
-            };
-        });
+            sortedNames.forEach(name => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = 'dropdown-item';
+                a.href = '#';
+                
+                const textSpan = document.createElement('span');
+                textSpan.textContent = name;
+                
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'preset-buttons';
+                
+                // Create edit button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-button small-button';
+                editBtn.textContent = '✎';
+                editBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.editPreset(name, presets[name]);
+                };
+                
+                // Create delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-button small-button';
+                deleteBtn.textContent = '×';
+                deleteBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.deletePreset(name);
+                };
+                
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.loadPreset(name, presets[name]);
+                };
+                
+                buttonContainer.appendChild(editBtn);
+                buttonContainer.appendChild(deleteBtn);
+                a.appendChild(textSpan);
+                a.appendChild(buttonContainer);
+                li.appendChild(a);
+                this.presetsList.appendChild(li);
+            });
+        } catch (error) {
+            console.error('Error initializing presets dropdown:', error);
+        }
     }
 
     initializeAnimationsDropdown() {
@@ -206,36 +201,31 @@ export class PresetManager {
         }
 
         try {
-            // Remove old event listeners
-            const oldItems = this.animationsList.querySelectorAll('.dropdown-item');
-            oldItems.forEach(item => {
-                item.replaceWith(item.cloneNode(true));
-            });
-
-            // Clear existing items
             this.animationsList.innerHTML = '';
-            
-            // Get saved animations from localStorage
             const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-            console.log('Available animations:', animations);
-            
-            // Sort animation names alphabetically
             const sortedNames = Object.keys(animations).sort();
             
-            // Add each animation to the dropdown
             sortedNames.forEach(name => {
                 const li = document.createElement('li');
                 const a = document.createElement('a');
                 a.className = 'dropdown-item';
                 a.href = '#';
                 
-                // Create span for the text content
                 const textSpan = document.createElement('span');
                 textSpan.textContent = name;
                 
-                // Create button container
                 const buttonContainer = document.createElement('div');
                 buttonContainer.className = 'preset-buttons';
+                
+                // Create edit button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-button small-button';
+                editBtn.textContent = '✎';
+                editBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.editAnimation(name, animations[name]);
+                };
                 
                 // Create delete button
                 const deleteBtn = document.createElement('button');
@@ -247,25 +237,19 @@ export class PresetManager {
                     this.deleteAnimation(name);
                 };
                 
-                // Add click handler for loading animation
                 a.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('Animation selected:', name);
-                    const animationData = animations[name];
-                    console.log('Animation data:', animationData);
-                    this.loadAnimationPreset(name, animationData);
+                    this.loadAnimationPreset(name, animations[name]);
                 };
                 
-                // Assemble the dropdown item
+                buttonContainer.appendChild(editBtn);
                 buttonContainer.appendChild(deleteBtn);
                 a.appendChild(textSpan);
                 a.appendChild(buttonContainer);
                 li.appendChild(a);
                 this.animationsList.appendChild(li);
             });
-
-            console.log('Animations dropdown initialized with', sortedNames.length, 'items');
         } catch (error) {
             console.error('Error initializing animations dropdown:', error);
         }
@@ -395,12 +379,87 @@ export class PresetManager {
         }
     }
 
-    startAnimation(animationType) {
-        console.log('Starting animation:', animationType);
-        // Add animation logic here
+    startAnimation() {
+        console.log('startAnimation called, current state:', { 
+            isAnimating: this.isAnimating, 
+            hasLoop: !!this.animationLoop 
+        });
+
+        // If already animating, stop the animation
+        if (this.isAnimating) {
+            console.log('Stopping existing animation');
+            this.stopAnimation();
+            return;
+        }
+
+        try {
+            const { startState, endState } = this.getAnimationStates();
+            console.log('Animation values:', { startState, endState });
+
+            // Reset to start position
+            this.triangleSystem.updateTriangleFromEdges(startState.nc1, startState.nc2, startState.nc3);
+            
+            // Animation parameters
+            const duration = 4000;
+            let startTime = null;
+            let forward = true;
+            this.isAnimating = true;
+
+            const animate = (currentTime) => {
+                if (!this.isAnimating) {
+                    console.log('Animation stopped');
+                    return;
+                }
+
+                if (startTime === null) {
+                    startTime = currentTime;
+                }
+
+                const elapsed = currentTime - startTime;
+                let progress = (elapsed % duration) / duration;
+                const loopCheckbox = document.getElementById('animation-loop');
+                const isLooping = loopCheckbox?.checked;
+
+                if (!isLooping && elapsed >= duration) {
+                    console.log('Animation complete');
+                    this.triangleSystem.updateTriangleFromEdges(endState.nc1, endState.nc2, endState.nc3);
+                    this.stopAnimation();
+                    return;
+                } else if (isLooping && elapsed >= duration) {
+                    forward = !forward;
+                    startTime = currentTime;
+                    progress = 0;
+                }
+
+                const effectiveProgress = forward ? progress : 1 - progress;
+                const current = {
+                    nc1: startState.nc1 + (endState.nc1 - startState.nc1) * effectiveProgress,
+                    nc2: startState.nc2 + (endState.nc2 - startState.nc2) * effectiveProgress,
+                    nc3: startState.nc3 + (endState.nc3 - startState.nc3) * effectiveProgress
+                };
+
+                this.triangleSystem.updateTriangleFromEdges(current.nc1, current.nc2, current.nc3);
+                this.animationLoop = requestAnimationFrame(animate);
+            };
+
+            this.animationLoop = requestAnimationFrame(animate);
+            console.log('Animation started');
+
+        } catch (error) {
+            console.error('Error in startAnimation:', error);
+            this.stopAnimation();
+        }
     }
 
-    // Add this method to handle animation playback
+    stopAnimation() {
+        this.isAnimating = false;
+        if (this.animationLoop) {
+            cancelAnimationFrame(this.animationLoop);
+            this.animationLoop = null;
+        }
+    }
+
+    // Keep existing playAnimation method
     playAnimation(name, config) {
         console.log('Playing animation:', name, config);
         if (this.triangleSystem) {
@@ -595,10 +654,7 @@ export class PresetManager {
         }
 
         try {
-            // Clear existing items
             this.presetsList.innerHTML = '';
-            
-            // Get saved presets
             const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
             const sortedNames = Object.keys(presets).sort();
             
@@ -614,6 +670,17 @@ export class PresetManager {
                 const buttonContainer = document.createElement('div');
                 buttonContainer.className = 'preset-buttons';
                 
+                // Create edit button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-button small-button';
+                editBtn.textContent = '✎';
+                editBtn.onclick = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.editPreset(name, presets[name]);
+                };
+                
+                // Create delete button
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-button small-button';
                 deleteBtn.textContent = '×';
@@ -626,10 +693,10 @@ export class PresetManager {
                 a.onclick = (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('Loading preset:', name);
                     this.loadPreset(name, presets[name]);
                 };
                 
+                buttonContainer.appendChild(editBtn);
                 buttonContainer.appendChild(deleteBtn);
                 a.appendChild(textSpan);
                 a.appendChild(buttonContainer);

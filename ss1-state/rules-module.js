@@ -43,7 +43,6 @@ export class TriangleSystem {
         // Then initialize controls
         this.initializeEventListeners();
         this.initializeManualControls();
-        this.initializeAnimations();  // Changed from initializeAnimationControls
         
         // Draw initial state
         this.drawSystem();
@@ -2589,147 +2588,12 @@ export class TriangleSystem {
         };
     }
 
-    initializeAnimations() {
-        const animationsList = document.getElementById('animationsList');
-        if (!animationsList) {
-            console.error('Animations list element not found');
-            return;
-        }
-
-        try {
-            // Clear existing items
-            animationsList.innerHTML = '';
-            
-            // Get saved animations from localStorage
-            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-            
-            // Sort animation names alphabetically
-            const sortedNames = Object.keys(animations).sort();
-            
-            // Add each animation to the dropdown
-            sortedNames.forEach(name => {
-                const li = document.createElement('li');
-                const a = document.createElement('a');
-                a.className = 'dropdown-item';
-                a.href = '#';
-                
-                // Create span for the text content
-                const textSpan = document.createElement('span');
-                textSpan.textContent = name;
-                
-                // Create button container
-                const buttonContainer = document.createElement('div');
-                buttonContainer.className = 'preset-buttons';
-                
-                // Create delete button
-                const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-button small-button';  // instead of 'btn btn-danger btn-sm'
-                deleteBtn.textContent = '×';
-                deleteBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (confirm(`Delete animation "${name}"?`)) {
-                        this.deleteAnimation(name);
-                    }
-                });
-                
-                // Add click handler for loading animation - FIXED HERE
-                a.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const animationData = animations[name];  // Get the animation data
-                    this.loadAnimationPreset(name, animationData);  // Pass both name and data
-                });
-                
-                // Assemble the dropdown item
-                buttonContainer.appendChild(deleteBtn);
-                a.appendChild(textSpan);
-                a.appendChild(buttonContainer);
-                li.appendChild(a);
-                animationsList.appendChild(li);
-            });
-        } catch (error) {
-            console.error('Error initializing animations dropdown:', error);
-        }
-    }
-
-    // Remove or update the old loadAnimation method
-    loadAnimation(name) {
-        try {
-            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-            const animation = animations[name];
-            
-            if (!animation) {
-                console.error(`Animation "${name}" not found`);
-                return;
-            }
-
-            // Call the proper loading method
-            this.loadAnimationPreset(name, animation);
-        } catch (error) {
-            console.error('Error loading animation:', error);
-        }
-    }
-
-    updateAnimationEndFields() {
-        // Get current edge lengths with correct mapping
-        const animationEndInputs = {
-            'animation-nc2': this.calculateDistance(this.system.n1, this.system.n2),  // NC2 maps to blue edge
-            'animation-nc1': this.calculateDistance(this.system.n1, this.system.n3),  // NC1 maps to red edge
-            'animation-nc3': this.calculateDistance(this.system.n2, this.system.n3)   // NC3 maps to green edge
-        };
-
-        // Update each field while preserving editability
-        Object.entries(animationEndInputs).forEach(([id, value]) => {
-            const input = document.getElementById(`${id}-end`);
-            if (input && !input.matches(':focus')) {  // Don't update if user is editing
-                input.value = value.toFixed(2);
-                input.readOnly = false;
-            }
-        });
-    }
-
-    // Add method to clear stored animation
-    clearStoredAnimation() {
-        this.storedAnimation = null;
-    }
-
-    // Update initializeAnimationControls to clear stored animation when values change
-    initializeAnimationControls() {
-        const animateButton = document.getElementById('animate-button');
-        const animationInputs = document.querySelectorAll('[id^="animation-nc"]');
-
-        if (animateButton) {
-            animateButton.addEventListener('click', () => {
-                this.startAnimation();
-            });
-        }
-
-        // Clear stored animation when inputs change
-        animationInputs.forEach(input => {
-            input.addEventListener('input', () => {
-                this.clearStoredAnimation();
-            });
-        });
-    }
-
-    
-
-    
-
-    
-
     checkInputFields() {
         const inputFields = document.querySelectorAll('input[type="text"]:not(.manual-input):not([readonly="false"])');
         inputFields.forEach(field => {
             field.readOnly = true;
         });
     }
-
-    
-
-    
-
-    
 
     // Add new method for image export
     exportToImage() {
@@ -3154,88 +3018,14 @@ export class TriangleSystem {
             return null;
         }
     }
-    // Add or update the startAnimation method
+    
     startAnimation() {
-        console.log('startAnimation called, current state:', { 
-            isAnimating: this.isAnimating, 
-            hasLoop: !!this.animationLoop 
-        });
-
-        // If already animating, stop the animation
-        if (this.isAnimating) {
-            console.log('Stopping existing animation');
-            this.stopAnimation();
-            return;
-        }
-
-        try {
-            const { startState, endState } = this.presetManager.getAnimationStates();
-            console.log('Animation values:', { startState, endState });
-
-            // Reset to start position
-            this.updateTriangleFromEdges(startState.nc1, startState.nc2, startState.nc3);
-            
-            // Animation parameters
-            const duration = 4000;
-            let startTime = null;
-            let forward = true;
-            this.isAnimating = true;
-
-            const animate = (currentTime) => {
-                if (!this.isAnimating) {
-                    console.log('Animation stopped');
-                    return;
-                }
-
-                if (startTime === null) {
-                    startTime = currentTime;
-                }
-
-                const elapsed = currentTime - startTime;
-                let progress = (elapsed % duration) / duration;
-                const loopCheckbox = document.getElementById('animation-loop');
-                const isLooping = loopCheckbox?.checked;
-
-                if (!isLooping && elapsed >= duration) {
-                    console.log('Animation complete');
-                    this.updateTriangleFromEdges(endState.nc1, endState.nc2, endState.nc3);
-                    this.stopAnimation();
-                    return;
-                } else if (isLooping && elapsed >= duration) {
-                    forward = !forward;
-                    startTime = currentTime;
-                    progress = 0;
-                }
-
-                const effectiveProgress = forward ? progress : 1 - progress;
-                const current = {
-                    nc1: startState.nc1 + (endState.nc1 - startState.nc1) * effectiveProgress,
-                    nc2: startState.nc2 + (endState.nc2 - startState.nc2) * effectiveProgress,
-                    nc3: startState.nc3 + (endState.nc3 - startState.nc3) * effectiveProgress
-                };
-
-                this.updateTriangleFromEdges(current.nc1, current.nc2, current.nc3);
-                this.animationLoop = requestAnimationFrame(animate);
-            };
-
-            this.animationLoop = requestAnimationFrame(animate);
-            console.log('Animation started');
-
-        } catch (error) {
-            console.error('Error in startAnimation:', error);
-            this.stopAnimation();
-        }
+        this.presetManager.startAnimation();
     }
 
     stopAnimation() {
-        this.isAnimating = false;
-        if (this.animationLoop) {
-            cancelAnimationFrame(this.animationLoop);
-            this.animationLoop = null;
-        }
+        this.presetManager.stopAnimation();
     }
-
-    
 
     // Add this method to update triangle dimensions
     updateTriangle(nc1, nc2, nc3) {
@@ -3261,8 +3051,6 @@ export class TriangleSystem {
             console.error('Error in updateTriangle:', error);
         }
     }
-
-    
 
     drawSubtriangle(ctx) {
         if (!this.showSubtriangle) return;
@@ -3493,8 +3281,6 @@ export class TriangleSystem {
                 'manual-ic3': this.calculateDistance(centroid, this.system.n3)   // I to Node 3
             };
 
-            
-
             // Update Manual IC Fields while preserving editability
             Object.entries(icValues).forEach(([id, value]) => {
                 const input = document.getElementById(id);
@@ -3510,8 +3296,6 @@ export class TriangleSystem {
                 'ic-2': icValues['manual-ic2'].toFixed(2),  // Changed from d-ic2
                 'ic-3': icValues['manual-ic3'].toFixed(2)   // Changed from d-ic3
             };
-
-            
 
             Object.entries(dashboardICValues).forEach(([id, value]) => {
                 const input = document.getElementById(id);
