@@ -1,4 +1,5 @@
 // Import necessary modules
+import { TriangleSystemController } from './shared/ui/controller.js';
 import { TriangleSystem, RulesModule } from './ss1-state/rules-module.js';
 import { EnvironmentModule } from './ss3-io/environment-module.js';
 import { IntelligenceModule } from './intelligence/intelligence-module.js';

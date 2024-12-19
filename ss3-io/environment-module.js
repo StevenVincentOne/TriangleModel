@@ -1,6 +1,9 @@
+import { LossFunction } from '../ss2-processing/data-processing.js';
+
 export class EnvironmentModule {
     constructor(intelligenceModule) {
         this.intelligenceModule = intelligenceModule;
+        this.lossFunction = new LossFunction();
         this.isGenerating = false;
         this.generationInterval = null;
         this.flowRate = 10;
