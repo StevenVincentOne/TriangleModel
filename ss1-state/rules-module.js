@@ -1411,6 +1411,35 @@ export class TriangleSystem {
                 });
             }
 
+            // Calculate and display circumcircle metrics
+            const circumcircleMetrics = this.calculateCircumcircleMetrics();
+            if (circumcircleMetrics) {
+                setElementValue('#circumcircle-area', circumcircleMetrics.area.toFixed(2));
+                setElementValue('#circumcircle-circumference', circumcircleMetrics.circumference.toFixed(2));
+                
+                // Calculate and display ratios if triangle area is not zero
+                const triangleArea = this.calculateArea();
+                if (triangleArea !== 0) {
+                    setElementValue('#circumcircle-area-ratio', 
+                        (circumcircleMetrics.area / triangleArea).toFixed(4));
+                }
+            }
+
+            // Calculate and display nine-point circle metrics
+            const ninePointMetrics = this.calculateNinePointCircleMetrics();
+            if (ninePointMetrics) {
+                setElementValue('#nine-point-area', ninePointMetrics.area.toFixed(2));
+                setElementValue('#nine-point-circumference', ninePointMetrics.circumference.toFixed(2));
+                
+                // Calculate and display ratios if circumcircle metrics exist
+                if (circumcircleMetrics) {
+                    setElementValue('#nine-point-area-ratio', 
+                        (ninePointMetrics.area / circumcircleMetrics.area).toFixed(4));
+                    setElementValue('#nine-point-circumference-ratio', 
+                        (ninePointMetrics.circumference / circumcircleMetrics.circumference).toFixed(4));
+                }
+            }
+
         } catch (error) {
             console.error('Error updating dashboard:', error);
         }
@@ -4686,6 +4715,37 @@ export class TriangleSystem {
                 nc3: this.calculateDistance(this.system.n2, this.system.n3)
             }
         };
+    }
+
+    // Add these methods to the TriangleSystem class
+    calculateCircumcircleMetrics() {
+        try {
+            const circumcircle = this.calculateCircumcircle();
+            if (!circumcircle || !circumcircle.radius) return null;
+            
+            return {
+                area: Math.PI * Math.pow(circumcircle.radius, 2),
+                circumference: 2 * Math.PI * circumcircle.radius
+            };
+        } catch (error) {
+            console.error('Error calculating circumcircle metrics:', error);
+            return null;
+        }
+    }
+
+    calculateNinePointCircleMetrics() {
+        try {
+            const ninePointCircle = this.calculateNinePointCircle();
+            if (!ninePointCircle || !ninePointCircle.radius) return null;
+            
+            return {
+                area: Math.PI * Math.pow(ninePointCircle.radius, 2),
+                circumference: 2 * Math.PI * ninePointCircle.radius
+            };
+        } catch (error) {
+            console.error('Error calculating nine-point circle metrics:', error);
+            return null;
+        }
     }
 }
 

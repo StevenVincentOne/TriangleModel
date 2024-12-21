@@ -240,15 +240,13 @@
                         <button id="letterFlowToggle" class="btn btn-primary btn-sm w-100 mb-2">Start Flow</button>
                         <button id="intelligenceToggle" class="btn btn-primary btn-sm w-100 mb-2">
                             Intelligence
-                            <span class="status-icon-off">✖️</span>
-                            <span class="status-icon-on">✔️</span>
+                            <span class="status-icon-off">&times;</span>
+                            <span class="status-icon-on">&check;</span>
                         </button>
                         <button id="zeroDataButton" class="btn btn-primary btn-sm w-100">Zero Data</button>
                     </div>
                 </div>
             </div>
-            
-            
 
             <!-- Add this section after the canvas and animation controls -->
             <div class="d-flex justify-content-center gap-2 mt-3">
@@ -290,10 +288,107 @@
         <!-- Dashboard container -->
         <div class="dashboard-container">
             
+            <!-- System State Panel -->
+            <div class="dashboard-panel">
+                <h3 class="panel-header">System State</h3>
+                <div class="panel-content">
+                    <!-- Main Values Section -->
+                    <div class="value-section">
+                        <div class="panel-row">
+                            <div class="label-value-pair">
+                                <label>H</label>
+                                <input id="system-h" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>HP</label>
+                                <input id="system-sph" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>HIC</label>
+                                <input id="system-mch" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>C</label>
+                                <input id="system-c" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label for="sh-b-ratio">H/C</label>
+                                <input id="sh-b-ratio" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label for="sph-area-ratio">HP/C</label>
+                                <input id="sph-area-ratio" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label for="mch-b-ratio">HIC/C</label>
+                                <input id="mch-b-ratio" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label for="hic-hp-ratio">HIC/HP</label>
+                                <input id="hic-hp-ratio" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label for="hp-h-ratio">HP/H</label>
+                                <input id="hp-h-ratio" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label for="hic-h-ratio">HIC/H</label>
+                                <input id="hic-h-ratio" type="text" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Environment Panel -->
+            <div class="dashboard-panel">
+                <h3 class="panel-header">System Environment</h3>
+                <div class="panel-content">
+                    <!-- Circumcircle Section -->
+                    <div class="value-section">
+                        <div class="panel-row">
+                            <div class="label-value-pair">
+                                <label>CC</label>
+                                <input id="circumcircle-area" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>HC</label>
+                                <input id="circumcircle-circumference" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>CC/C</label>
+                                <input id="circumcircle-area-ratio" type="text" readonly>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Nine-Point Circle Section -->
+                    <div class="value-section">
+                        <div class="panel-row">
+                            <div class="label-value-pair">
+                                <label>NPC</label>
+                                <input id="nine-point-area" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>HNP</label>
+                                <input id="nine-point-circumference" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>NPC/CC</label>
+                                <input id="nine-point-area-ratio" type="text" readonly>
+                            </div>
+                            <div class="label-value-pair">
+                                <label>HNP/HC</label>
+                                <input id="nine-point-circumference-ratio" type="text" readonly>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <!-- System Panel -->
-                <div class="dashboard-panel">
-                    <h3 class="panel-header">System</h3>
+            <div class="dashboard-panel">
+                    <h3 class="panel-header">System Properties</h3>
                     <div class="panel-row">  <!-- Changed to panel-row for horizontal alignment -->
                         <!-- Nodes Panel -->
                         <div class="dashboard-panel">
@@ -450,97 +545,7 @@
                         </div>
                     </div>
                 </div>
-
-            <!-- System Entropy and Capacity Panel -->
-            <div class="dashboard-panel">
-                <h3 class="panel-header">System Entropy and Capacity</h3>
-                <div class="panel-content">
-                    <!-- Main Values Section -->
-                    <div class="value-section">
-                        <div class="panel-row">
-                            <div class="label-value-pair">
-                                <label>H</label>
-                                <input id="system-h" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>HP</label>
-                                <input id="system-sph" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>HIC</label>
-                                <input id="system-mch" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>C</label>
-                                <input id="system-c" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="sh-b-ratio">H/C</label>
-                                <input id="sh-b-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="b-sh-ratio">C/H</label>
-                                <input id="b-sh-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="sph-area-ratio">HP/C</label>
-                                <input id="sph-area-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="b-sph-ratio">C/HP</label>
-                                <input id="b-sph-ratio" type="text" readonly>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Primary Ratios Section -->
-                    <div class="value-section">
-                        <div class="panel-row">
-                            
-                            <div class="label-value-pair">
-                                <label for="mch-b-ratio">HIC/C</label>
-                                <input id="mch-b-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="b-mch-ratio">C/HIC</label>
-                                <input id="b-mch-ratio" type="text" readonly>
-                            <div>
-                        </div>
-                    </div>
-
-                    <!-- Secondary Ratios Section -->
-                    <div class="value-section">
-                        <div class="panel-row">
-                            <div class="label-value-pair">
-                                <label for="hp-hic-ratio">HP/HIC</label>
-                                <input id="hp-hic-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="hic-hp-ratio">HIC/HP</label>
-                                <input id="hic-hp-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="hp-h-ratio">HP/H</label>
-                                <input id="hp-h-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="h-hp-ratio">H/HP</label>
-                                <input id="h-hp-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="hic-h-ratio">HIC/H</label>
-                                <input id="hic-h-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="h-hic-ratio">H/HIC</label>
-                                <input id="h-hic-ratio" type="text" readonly>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
-        </div>
-    </div>
 
         <!-- Subsystems Panel -->
         <div class="dashboard-panel">
@@ -1050,6 +1055,18 @@
                 </div>
                 <div class="col-md-3">
                     <p>T: Tangent point of Incircle</p>
+                </div>
+                <div class="col-md-3">
+                    <p>CC: Circumcircle Capacity (Area)</p>
+                </div>
+                <div class="col-md-3">
+                    <p>HC: Circumcircle Entropy (Circumference)</p>
+                </div>
+                <div class="col-md-3">
+                    <p>NPC: Nine-Point Circle Capacity (Area)</p>
+                </div>
+                <div class="col-md-3">
+                    <p>HNP: Nine-Point Circle Entropy (Circumference)</p>
                 </div>
             </div>
         </div>

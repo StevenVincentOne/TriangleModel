@@ -2110,28 +2110,22 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     border-color: #146c43 !important;
 }
 
-/* Status Icons */
-#intelligenceToggle .status-icon-off,
-#intelligenceToggle .status-icon-on {
-    margin-left: 5px;
-}
-
-/* Default state (off) - Red X */
+/* Status Icons - More specific selectors with !important */
 #intelligenceToggle .status-icon-off {
     display: inline;
-    color: #dc3545;  /* Red X */
+    color: #ff0000 !important;  /* Bright red */
 }
 
 #intelligenceToggle .status-icon-on {
     display: none;
+    color: #00ff00 !important;  /* Bright green */
 }
 
-/* Active state (on) - Green checkmark */
+/* Active state (on) */
 #intelligenceToggle.active .status-icon-off {
     display: none;
 }
 
 #intelligenceToggle.active .status-icon-on {
     display: inline;
-    color: #28a745;  /* Green checkmark */
 }
