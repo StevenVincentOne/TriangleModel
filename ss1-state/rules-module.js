@@ -1,5 +1,6 @@
 import { TriangleDatabase } from '../shared/ui/database.js';
 import { PresetManager, ImportManager } from '../shared/ui/ui-manager.js';
+import { CircleMetrics } from '../ss3-io/environment-module.js';
 
 export class TriangleSystem {
     constructor(canvasId) {
@@ -145,6 +146,10 @@ export class TriangleSystem {
         // Initialize managers
         this.importManager = new ImportManager(this);
 
+        // Initialize CircleMetrics if not already done
+        if (!this.circleMetrics) {
+            this.circleMetrics = new CircleMetrics(this);
+        }
     }  // End of constructor
 
     loadPreset(name, values) {
@@ -1411,33 +1416,31 @@ export class TriangleSystem {
                 });
             }
 
+            // Initialize CircleMetrics if not already done
+            if (!this.circleMetrics) {
+                this.circleMetrics = new CircleMetrics(this);
+            }
+
             // Calculate and display circumcircle metrics
-            const circumcircleMetrics = this.calculateCircumcircleMetrics();
+            const circumcircleMetrics = this.circleMetrics.calculateCircumcircleMetrics();
+            console.log('Received Circumcircle Metrics:', circumcircleMetrics);
             if (circumcircleMetrics) {
-                setElementValue('#circumcircle-area', circumcircleMetrics.area.toFixed(2));
-                setElementValue('#circumcircle-circumference', circumcircleMetrics.circumference.toFixed(2));
-                
-                // Calculate and display ratios if triangle area is not zero
-                const triangleArea = this.calculateArea();
-                if (triangleArea !== 0) {
-                    setElementValue('#circumcircle-area-ratio', 
-                        (circumcircleMetrics.area / triangleArea).toFixed(4));
-                }
+                this.setElementValue('#circumcircle-area', circumcircleMetrics.area.toFixed(2));
             }
 
             // Calculate and display nine-point circle metrics
-            const ninePointMetrics = this.calculateNinePointCircleMetrics();
+            const ninePointMetrics = this.circleMetrics.calculateNinePointCircleMetrics();
+            console.log('Received Nine-Point Circle Metrics:', ninePointMetrics);
             if (ninePointMetrics) {
-                setElementValue('#nine-point-area', ninePointMetrics.area.toFixed(2));
-                setElementValue('#nine-point-circumference', ninePointMetrics.circumference.toFixed(2));
-                
-                // Calculate and display ratios if circumcircle metrics exist
-                if (circumcircleMetrics) {
-                    setElementValue('#nine-point-area-ratio', 
-                        (ninePointMetrics.area / circumcircleMetrics.area).toFixed(4));
-                    setElementValue('#nine-point-circumference-ratio', 
-                        (ninePointMetrics.circumference / circumcircleMetrics.circumference).toFixed(4));
-                }
+                this.setElementValue('#nine-point-area', ninePointMetrics.area.toFixed(2));
+            }
+
+            // Calculate external regions
+            const externalMetrics = this.circleMetrics.calculateExternalRegions();
+            if (externalMetrics) {
+                this.setElementValue('#cc1-area', externalMetrics.cc1.toFixed(2));
+                this.setElementValue('#cc2-area', externalMetrics.cc2.toFixed(2));
+                this.setElementValue('#cc3-area', externalMetrics.cc3.toFixed(2));
             }
 
         } catch (error) {
@@ -4715,37 +4718,6 @@ export class TriangleSystem {
                 nc3: this.calculateDistance(this.system.n2, this.system.n3)
             }
         };
-    }
-
-    // Add these methods to the TriangleSystem class
-    calculateCircumcircleMetrics() {
-        try {
-            const circumcircle = this.calculateCircumcircle();
-            if (!circumcircle || !circumcircle.radius) return null;
-            
-            return {
-                area: Math.PI * Math.pow(circumcircle.radius, 2),
-                circumference: 2 * Math.PI * circumcircle.radius
-            };
-        } catch (error) {
-            console.error('Error calculating circumcircle metrics:', error);
-            return null;
-        }
-    }
-
-    calculateNinePointCircleMetrics() {
-        try {
-            const ninePointCircle = this.calculateNinePointCircle();
-            if (!ninePointCircle || !ninePointCircle.radius) return null;
-            
-            return {
-                area: Math.PI * Math.pow(ninePointCircle.radius, 2),
-                circumference: 2 * Math.PI * ninePointCircle.radius
-            };
-        } catch (error) {
-            console.error('Error calculating nine-point circle metrics:', error);
-            return null;
-        }
     }
 }
 

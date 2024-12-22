@@ -288,6 +288,39 @@
         <!-- Dashboard container -->
         <div class="dashboard-container">
             
+            <!-- System Environment Panel -->
+            <div class="dashboard-panel">
+                <h3 class="panel-header">System Environment</h3>
+                <div class="panel-content">
+                    <!-- Circumcircle Row -->
+                    <div class="panel-row">
+                        <div class="label-value-pair">
+                            <label>CC</label>
+                            <input id="circumcircle-area" class="env-input" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>CC1</label>
+                            <input id="cc1-area" class="env-input" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>CC2</label>
+                            <input id="cc2-area" class="env-input" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>CC3</label>
+                            <input id="cc3-area" class="env-input" type="text" readonly>
+                        </div>
+                    </div>
+                    <!-- 9 Point Circle Row -->
+                    <div class="panel-row">
+                        <div class="label-value-pair">
+                            <label>9C</label>
+                            <input id="nine-point-area" class="env-input" type="text" readonly>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- System State Panel -->
             <div class="dashboard-panel">
                 <h3 class="panel-header">System State</h3>
@@ -340,55 +373,9 @@
                 </div>
             </div>
 
-            <!-- System Environment Panel -->
-            <div class="dashboard-panel">
-                <h3 class="panel-header">System Environment</h3>
-                <div class="panel-content">
-                    <!-- Circumcircle Section -->
-                    <div class="value-section">
-                        <div class="panel-row">
-                            <div class="label-value-pair">
-                                <label>CC</label>
-                                <input id="circumcircle-area" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>HC</label>
-                                <input id="circumcircle-circumference" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>CC/C</label>
-                                <input id="circumcircle-area-ratio" type="text" readonly>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Nine-Point Circle Section -->
-                    <div class="value-section">
-                        <div class="panel-row">
-                            <div class="label-value-pair">
-                                <label>NPC</label>
-                                <input id="nine-point-area" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>HNP</label>
-                                <input id="nine-point-circumference" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>NPC/CC</label>
-                                <input id="nine-point-area-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>HNP/HC</label>
-                                <input id="nine-point-circumference-ratio" type="text" readonly>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- System Panel -->
             <div class="dashboard-panel">
-                    <h3 class="panel-header">System Properties</h3>
+                    <h3 class="panel-header">System</h3>
                     <div class="panel-row">  <!-- Changed to panel-row for horizontal alignment -->
                         <!-- Nodes Panel -->
                         <div class="dashboard-panel">
@@ -1055,18 +1042,6 @@
                 </div>
                 <div class="col-md-3">
                     <p>T: Tangent point of Incircle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>CC: Circumcircle Capacity (Area)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>HC: Circumcircle Entropy (Circumference)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>NPC: Nine-Point Circle Capacity (Area)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>HNP: Nine-Point Circle Entropy (Circumference)</p>
                 </div>
             </div>
         </div>

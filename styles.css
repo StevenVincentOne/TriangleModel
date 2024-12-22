@@ -2129,3 +2129,17 @@ input[id*="euler"] {  /* Added Euler Line inputs */
 #intelligenceToggle.active .status-icon-on {
     display: inline;
 }
+
+.env-input {
+    width: 10ch !important;  /* Force width to be 10 characters */
+    min-width: 10ch !important;
+    max-width: 10ch !important;
+}
+
+.dashboard-panel .panel-content .panel-row .label-value-pair .env-input {
+    width: 10ch !important;
+    min-width: 10ch !important;
+    max-width: 10ch !important;
+    flex: none !important;  /* Prevent flex growth */
+    box-sizing: border-box !important;  /* Include padding in width calculation */
+}
