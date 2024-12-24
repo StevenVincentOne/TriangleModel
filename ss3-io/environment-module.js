@@ -238,6 +238,7 @@ export class CircleMetrics {
 
             const { n1, n2, n3 } = this.triangleSystem.system;
 
+            // Create circle and triangle paths
             const circle = new paper.Path.Circle({
                 center: circumcircle.center,
                 radius: circumcircle.radius,
@@ -254,26 +255,96 @@ export class CircleMetrics {
                 triangle.reverse();
             }
 
+            // Calculate total external area
             const totalCircleArea = Math.abs(circle.area);
             const intersection = triangle.intersect(circle);
             const internalArea = intersection ? Math.abs(intersection.area) : 0;
             const externalArea = totalCircleArea - internalArea;
+
+            // Calculate angles maintaining vertex order
+            const angles = this.calculateAngles(n1, n2, n3);
+            const totalAngle = angles.a1 + angles.a2 + angles.a3;
+
+            // Map external regions to edges:
+            // CC1 corresponds to edge N1-N3
+            // CC2 corresponds to edge N2-N1
+            // CC3 corresponds to edge N3-N2
+            const cc1 = (angles.a2 / totalAngle) * externalArea; // Opposite to N2
+            const cc2 = (angles.a3 / totalAngle) * externalArea; // Opposite to N3
+            const cc3 = (angles.a1 / totalAngle) * externalArea; // Opposite to N1
 
             // Clean up
             circle.remove();
             triangle.remove();
             if (intersection) intersection.remove();
 
+            console.log('External regions calculation:', {
+                angles: {
+                    a1: angles.a1 * 180 / Math.PI,
+                    a2: angles.a2 * 180 / Math.PI,
+                    a3: angles.a3 * 180 / Math.PI
+                },
+                edges: {
+                    'N1-N3': cc1,
+                    'N2-N1': cc2,
+                    'N3-N2': cc3
+                }
+            });
+
             return {
                 totalExternal: externalArea,
-                cc1: externalArea / 3,
-                cc2: externalArea / 3,
-                cc3: externalArea / 3
+                cc1: cc1,
+                cc2: cc2,
+                cc3: cc3
             };
         } catch (error) {
             console.error('Error calculating external regions:', error);
             return null;
         }
+    }
+
+    calculateAngles(n1, n2, n3) {
+        // Log input vertices
+        console.log('Calculating angles for vertices:', {
+            n1: `(${n1.x}, ${n1.y})`,
+            n2: `(${n2.x}, ${n2.y})`,
+            n3: `(${n3.x}, ${n3.y})`
+        });
+
+        // Calculate vectors
+        const v1 = { x: n2.x - n1.x, y: n2.y - n1.y }; // Vector from n1 to n2
+        const v2 = { x: n3.x - n2.x, y: n3.y - n2.y }; // Vector from n2 to n3
+        const v3 = { x: n1.x - n3.x, y: n1.y - n3.y }; // Vector from n3 to n1
+
+        // Calculate angles in radians
+        // Angle at n1 between vectors -v3 and v1
+        const a1 = Math.abs(Math.atan2(
+            v1.x * (-v3.y) - v1.y * (-v3.x),
+            v1.x * (-v3.x) + v1.y * (-v3.y)
+        ));
+
+        // Angle at n2 between vectors -v1 and v2
+        const a2 = Math.abs(Math.atan2(
+            v2.x * (-v1.y) - v2.y * (-v1.x),
+            v2.x * (-v1.x) + v2.y * (-v1.y)
+        ));
+
+        // Angle at n3 between vectors -v2 and v3
+        const a3 = Math.abs(Math.atan2(
+            v3.x * (-v2.y) - v3.y * (-v2.x),
+            v3.x * (-v2.x) + v3.y * (-v2.y)
+        ));
+
+        // Log calculated angles in degrees
+        const angles = { 
+            a1: (a1 * 180 / Math.PI), 
+            a2: (a2 * 180 / Math.PI), 
+            a3: (a3 * 180 / Math.PI)
+        };
+        console.log('Calculated angles (degrees):', angles);
+        console.log('Total angle sum:', angles.a1 + angles.a2 + angles.a3);
+
+        return { a1, a2, a3 };
     }
 
     calculateNinePointCircleMetrics() {
