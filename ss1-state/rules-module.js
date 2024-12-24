@@ -1428,19 +1428,51 @@ export class TriangleSystem {
                 this.setElementValue('#circumcircle-area', circumcircleMetrics.area.toFixed(2));
             }
 
-            // Calculate and display nine-point circle metrics
-            const ninePointMetrics = this.circleMetrics.calculateNinePointCircleMetrics();
-            console.log('Received Nine-Point Circle Metrics:', ninePointMetrics);
-            if (ninePointMetrics) {
-                this.setElementValue('#nine-point-area', ninePointMetrics.area.toFixed(2));
-            }
-
-            // Calculate external regions
+            // Calculate and display external regions for circumcircle
             const externalMetrics = this.circleMetrics.calculateExternalRegions();
             if (externalMetrics) {
                 this.setElementValue('#cc1-area', externalMetrics.cc1.toFixed(2));
                 this.setElementValue('#cc2-area', externalMetrics.cc2.toFixed(2));
                 this.setElementValue('#cc3-area', externalMetrics.cc3.toFixed(2));
+            }
+
+            // Calculate and display nine-point circle metrics
+            const metrics = this.circleMetrics.calculateNinePointCircleMetrics();
+            const regions = this.circleMetrics.calculateNinePointExternalRegions();
+
+            console.log('Received Nine-Point Circle Metrics:', metrics);
+            console.log('Updating dashboard with metrics:', { metrics, regions });
+
+            if (metrics && typeof metrics === 'object') {
+                // Update total area
+                if (metrics.area !== undefined) {
+                    this.setElementValue('#nine-point-area', metrics.area.toFixed(2));
+                }
+
+                // Update external and internal areas
+                if (regions && regions.totalExternal !== undefined) {
+                    this.setElementValue('#nine-point-external', regions.totalExternal.toFixed(2));
+                    
+                    // Calculate internal area as total - external
+                    const internalArea = metrics.area - regions.totalExternal;
+                    this.setElementValue('#nine-point-internal', internalArea.toFixed(2));
+                    
+                    // Calculate and display the ratio
+                    if (internalArea === 0) {
+                        this.setElementValue('#nine-point-ratio', '0.000');
+                    } else {
+                        const ratio = regions.totalExternal / internalArea;
+                        this.setElementValue('#nine-point-ratio', ratio.toFixed(3));
+                    }
+                }
+
+                // Debug check for HTML elements
+                console.log('Found elements:', {
+                    totalArea: document.querySelector('#nine-point-area') ? 'yes' : 'no',
+                    externalArea: document.querySelector('#nine-point-external') ? 'yes' : 'no',
+                    internalArea: document.querySelector('#nine-point-internal') ? 'yes' : 'no',
+                    areaRatio: document.querySelector('#nine-point-ratio') ? 'yes' : 'no'
+                });
             }
 
         } catch (error) {
@@ -4375,7 +4407,7 @@ export class TriangleSystem {
         });
 
         // Now initialize each search box
-        for (let i = 1; i <= 3; i++) {
+        for (let i =1; i <= 3; i++) {
             const searchInput = document.getElementById(`info-search-${i}`);
             const searchResults = document.getElementById(`search-results-${i}`);
             const displayValue = document.getElementById(`info-display-value-${i}`);
