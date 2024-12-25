@@ -1,7 +1,9 @@
 import { LossFunction } from '../ss2-processing/data-processing.js';
+import { CircleMetrics } from './circle-metrics.js';
+import { CapacityModule } from './capacity-module.js';
 
 export class EnvironmentModule {
-    constructor(intelligenceModule) {
+    constructor(intelligenceModule, triangleSystem) {
         this.intelligenceModule = intelligenceModule;
         this.lossFunction = new LossFunction();
         this.isGenerating = false;
@@ -42,6 +44,9 @@ export class EnvironmentModule {
                 }
             });
         }
+
+        this.circleMetrics = new CircleMetrics(triangleSystem);
+        this.capacityModule = new CapacityModule(this.circleMetrics);
     }
 
     initializeControls() {
@@ -100,6 +105,44 @@ export class EnvironmentModule {
                 }
             });
         }
+
+        // Add disturbance controls
+        this.initializeDisturbanceControls();
+    }
+
+    initializeDisturbanceControls() {
+        const disturbancePanel = document.getElementById('disturbanceControls');
+        if (!disturbancePanel) return;
+
+        const buttons = [
+            { id: 'randomDisturbance', label: 'Random Disturbance', type: 'random' },
+            { id: 'bitsSurge', label: 'Bits Surge', type: 'bits-surge' },
+            { id: 'noiseSurge', label: 'Noise Surge', type: 'noise-surge' },
+            { id: 'capacityDrop', label: 'Capacity Drop', type: 'capacity-drop' }
+        ];
+
+        buttons.forEach(btn => {
+            const button = document.createElement('button');
+            button.id = btn.id;
+            button.textContent = btn.label;
+            button.addEventListener('click', () => {
+                this.capacityModule.introduceDisturbance({
+                    type: btn.type,
+                    intensity: 0.5,
+                    duration: 5000
+                });
+            });
+            disturbancePanel.appendChild(button);
+        });
+
+        // Add intensity slider
+        const intensitySlider = document.createElement('input');
+        intensitySlider.type = 'range';
+        intensitySlider.min = '0';
+        intensitySlider.max = '100';
+        intensitySlider.value = '50';
+        intensitySlider.id = 'disturbanceIntensity';
+        disturbancePanel.appendChild(intensitySlider);
     }
 
     updateFlowRate(newRate) {
@@ -196,234 +239,6 @@ export class EnvironmentModule {
         if (this.intelligenceModule) {
             const letter = this.randomGenerator.generateLetter();
             this.intelligenceModule.processLetter(letter);
-        }
-    }
-}
-
-export class CircleMetrics {
-    constructor(triangleSystem) {
-        this.triangleSystem = triangleSystem;
-        if (typeof paper === 'undefined') {
-            console.error('Paper.js library not loaded!');
-            return;
-        }
-        const canvas = document.createElement('canvas');
-        paper.setup(canvas);
-    }
-
-    calculateCircumcircleMetrics() {
-        try {
-            const circumcircle = this.triangleSystem.calculateCircumcircle();
-            if (!circumcircle || !circumcircle.radius) {
-                return null;
-            }
-            
-            const area = Math.PI * Math.pow(circumcircle.radius, 2);
-            return {
-                area: area,
-                circumference: 2 * Math.PI * circumcircle.radius
-            };
-        } catch (error) {
-            console.error('Error calculating circumcircle metrics:', error);
-            return null;
-        }
-    }
-
-    calculateExternalRegions() {
-        try {
-            const circumcircle = this.triangleSystem.calculateCircumcircle();
-            if (!circumcircle || !circumcircle.radius) {
-                return null;
-            }
-
-            const { n1, n2, n3 } = this.triangleSystem.system;
-
-            // Create circle and triangle paths
-            const circle = new paper.Path.Circle({
-                center: circumcircle.center,
-                radius: circumcircle.radius,
-                fillColor: new paper.Color(1, 0, 0, 0.5)
-            });
-
-            const triangle = new paper.Path({
-                segments: [n1, n2, n3],
-                closed: true,
-                fillColor: new paper.Color(0, 0, 1, 0.5)
-            });
-
-            if (triangle.clockwise) {
-                triangle.reverse();
-            }
-
-            // Calculate total external area
-            const totalCircleArea = Math.abs(circle.area);
-            const intersection = triangle.intersect(circle);
-            const internalArea = intersection ? Math.abs(intersection.area) : 0;
-            const externalArea = totalCircleArea - internalArea;
-
-            // Calculate angles maintaining vertex order
-            const angles = this.calculateAngles(n1, n2, n3);
-            const totalAngle = angles.a1 + angles.a2 + angles.a3;
-
-            // Map external regions to edges:
-            // CC1 corresponds to edge N1-N3
-            // CC2 corresponds to edge N2-N1
-            // CC3 corresponds to edge N3-N2
-            const cc1 = (angles.a2 / totalAngle) * externalArea; // Opposite to N2
-            const cc2 = (angles.a3 / totalAngle) * externalArea; // Opposite to N3
-            const cc3 = (angles.a1 / totalAngle) * externalArea; // Opposite to N1
-
-            // Clean up
-            circle.remove();
-            triangle.remove();
-            if (intersection) intersection.remove();
-
-            console.log('External regions calculation:', {
-                angles: {
-                    a1: angles.a1 * 180 / Math.PI,
-                    a2: angles.a2 * 180 / Math.PI,
-                    a3: angles.a3 * 180 / Math.PI
-                },
-                edges: {
-                    'N1-N3': cc1,
-                    'N2-N1': cc2,
-                    'N3-N2': cc3
-                }
-            });
-
-            return {
-                totalExternal: externalArea,
-                cc1: cc1,
-                cc2: cc2,
-                cc3: cc3
-            };
-        } catch (error) {
-            console.error('Error calculating external regions:', error);
-            return null;
-        }
-    }
-
-    calculateAngles(n1, n2, n3) {
-        // Log input vertices
-        console.log('Calculating angles for vertices:', {
-            n1: `(${n1.x}, ${n1.y})`,
-            n2: `(${n2.x}, ${n2.y})`,
-            n3: `(${n3.x}, ${n3.y})`
-        });
-
-        // Calculate vectors
-        const v1 = { x: n2.x - n1.x, y: n2.y - n1.y }; // Vector from n1 to n2
-        const v2 = { x: n3.x - n2.x, y: n3.y - n2.y }; // Vector from n2 to n3
-        const v3 = { x: n1.x - n3.x, y: n1.y - n3.y }; // Vector from n3 to n1
-
-        // Calculate angles in radians
-        // Angle at n1 between vectors -v3 and v1
-        const a1 = Math.abs(Math.atan2(
-            v1.x * (-v3.y) - v1.y * (-v3.x),
-            v1.x * (-v3.x) + v1.y * (-v3.y)
-        ));
-
-        // Angle at n2 between vectors -v1 and v2
-        const a2 = Math.abs(Math.atan2(
-            v2.x * (-v1.y) - v2.y * (-v1.x),
-            v2.x * (-v1.x) + v2.y * (-v1.y)
-        ));
-
-        // Angle at n3 between vectors -v2 and v3
-        const a3 = Math.abs(Math.atan2(
-            v3.x * (-v2.y) - v3.y * (-v2.x),
-            v3.x * (-v2.x) + v3.y * (-v2.y)
-        ));
-
-        // Log calculated angles in degrees
-        const angles = { 
-            a1: (a1 * 180 / Math.PI), 
-            a2: (a2 * 180 / Math.PI), 
-            a3: (a3 * 180 / Math.PI)
-        };
-        console.log('Calculated angles (degrees):', angles);
-        console.log('Total angle sum:', angles.a1 + angles.a2 + angles.a3);
-
-        return { a1, a2, a3 };
-    }
-
-    calculateNinePointCircleMetrics() {
-        try {
-            const ninePointCircle = this.triangleSystem.calculateNinePointCircle();
-            if (!ninePointCircle || !ninePointCircle.radius) {
-                return null;
-            }
-            
-            const area = Math.PI * Math.pow(ninePointCircle.radius, 2);
-            return {
-                area: area,
-                circumference: 2 * Math.PI * ninePointCircle.radius
-            };
-        } catch (error) {
-            console.error('Error calculating nine-point circle metrics:', error);
-            return null;
-        }
-    }
-
-    calculateNinePointExternalRegions() {
-        try {
-            const ninePointCircle = this.triangleSystem.calculateNinePointCircle();
-            if (!ninePointCircle || !ninePointCircle.radius) {
-                return null;
-            }
-
-            const { n1, n2, n3 } = this.triangleSystem.system;
-
-            const circle = new paper.Path.Circle({
-                center: ninePointCircle.center,
-                radius: ninePointCircle.radius,
-                fillColor: new paper.Color(1, 0, 0, 0.5)
-            });
-
-            const triangle = new paper.Path({
-                segments: [n1, n2, n3],
-                closed: true,
-                fillColor: new paper.Color(0, 0, 1, 0.5)
-            });
-
-            if (triangle.clockwise) {
-                triangle.reverse();
-            }
-
-            // Flatten paths slightly to improve intersection accuracy
-            circle.flatten(0.5);  // Smaller value = more precise
-            triangle.flatten(0.5);
-
-            const totalCircleArea = Math.abs(circle.area);
-            const intersection = triangle.intersect(circle);
-            const internalArea = intersection ? Math.abs(intersection.area) : 0;
-            
-            // Apply epsilon threshold for very small external areas
-            const epsilon = 1e-10;  // Adjust this value if needed
-            let externalArea = totalCircleArea - internalArea;
-            
-            // If external area is very small relative to total area, consider it zero
-            if (Math.abs(externalArea) < epsilon * totalCircleArea) {
-                externalArea = 0;
-            }
-
-            // Clean up
-            circle.remove();
-            triangle.remove();
-            if (intersection) intersection.remove();
-
-            return {
-                totalExternal: externalArea,
-                nc1: 0,
-                nc2: 0,
-                nc3: 0,
-                nc1Ratio: 0,
-                nc2Ratio: 0,
-                nc3Ratio: 0
-            };
-        } catch (error) {
-            console.error('Error calculating nine-point external regions:', error);
-            return null;
         }
     }
 } 

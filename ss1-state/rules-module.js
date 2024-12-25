@@ -1,11 +1,32 @@
 import { TriangleDatabase } from '../shared/ui/database.js';
 import { PresetManager, ImportManager } from '../shared/ui/ui-manager.js';
-import { CircleMetrics } from '../ss3-io/environment-module.js';
+import { CircleMetrics } from '../ss3-io/circle-metrics.js';  // Updated import path
+
+export class RulesModule {
+    constructor(system, canvas, ctx, intelligenceModule, environmentModule) {
+        this.system = system || this.initializeEmptySystem();
+        this.canvas = canvas;
+        this.ctx = ctx;
+        this.intelligenceModule = intelligenceModule;
+        this.environmentModule = environmentModule;
+        this.capacityModule = this.environmentModule.capacityModule;
+
+        // Simulate asynchronous initialization if necessary
+        setTimeout(() => {
+            // Initialization logic here
+            console.log('RulesModule initialized');
+
+            // Dispatch event to signal readiness
+            document.dispatchEvent(new Event('RulesModuleReady'));
+        }, 0); // Adjust timing as necessary
+    }
+}
 
 export class TriangleSystem {
-    constructor(canvasId) {
+    constructor(canvasId, ctx, rulesModule) {
         this.canvas = canvasId;
-        this.ctx = canvasId.getContext('2d');
+        this.ctx = ctx;
+        this.rulesModule = rulesModule;
         
         // Set up canvas dimensions
         this.canvas.width = canvasId.clientWidth;
@@ -150,6 +171,10 @@ export class TriangleSystem {
         if (!this.circleMetrics) {
             this.circleMetrics = new CircleMetrics(this);
         }
+
+        // Add animation-related properties
+        this.animationLoop = null;
+        this.animationFrame = null;
     }  // End of constructor
 
     loadPreset(name, values) {
@@ -309,7 +334,21 @@ export class TriangleSystem {
             if (button) {
                 button.addEventListener('click', () => {
                     console.log('Animate button clicked');
-                    this.startAnimation();
+                    // Create animation object from current input values
+                    const animation = {
+                        start: {
+                            nc1: { x: parseFloat(document.getElementById('animation-nc1-start').value), y: 0 },
+                            nc2: { x: parseFloat(document.getElementById('animation-nc2-start').value), y: 0 },
+                            nc3: { x: parseFloat(document.getElementById('animation-nc3-start').value), y: 0 }
+                        },
+                        end: {
+                            nc1: { x: parseFloat(document.getElementById('animation-nc1-end').value), y: 0 },
+                            nc2: { x: parseFloat(document.getElementById('animation-nc2-end').value), y: 0 },
+                            nc3: { x: parseFloat(document.getElementById('animation-nc3-end').value), y: 0 }
+                        },
+                        loop: document.getElementById('animation-loop').checked
+                    };
+                    this.applyAnimation(animation);
                 });
             }
         });
@@ -320,7 +359,32 @@ export class TriangleSystem {
             if (button) {
                 button.addEventListener('click', () => {
                     console.log('Save Animation button clicked');
-                    this.saveCurrentAnimation();
+                    // Create animation object to save
+                    const animation = {
+                        start: {
+                            nc1: document.getElementById('animation-nc1-start').value,
+                            nc2: document.getElementById('animation-nc2-start').value,
+                            nc3: document.getElementById('animation-nc3-start').value
+                        },
+                        end: {
+                            nc1: document.getElementById('animation-nc1-end').value,
+                            nc2: document.getElementById('animation-nc2-end').value,
+                            nc3: document.getElementById('animation-nc3-end').value
+                        },
+                        loop: document.getElementById('animation-loop').checked
+                    };
+
+                    const name = prompt('Enter a name for this animation preset:');
+                    if (name) {
+                        try {
+                            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+                            animations[name] = animation;
+                            localStorage.setItem('userAnimations', JSON.stringify(animations));
+                            console.log(`Animation preset "${name}" saved successfully`);
+                        } catch (error) {
+                            console.error('Error saving animation preset:', error);
+                        }
+                    }
                 });
             }
         });
@@ -758,6 +822,10 @@ export class TriangleSystem {
     }
 
     updateDashboard() {
+        if (!this.rulesModule) {
+            console.log('RulesModule not yet available, skipping dashboard update.');
+            return;
+        }
         try {
             if (!this.isSystemInitialized()) {
                 console.log('System not fully initialized, skipping dashboard update');
@@ -995,22 +1063,62 @@ export class TriangleSystem {
                     sphAreaRatioElement.value = ratio.toFixed(4);
                     areaSphRatioElement.value = (1 / ratio).toFixed(4);
                 }
-            }  // Close the first if block
-
-            // Calculate I-Channel Entropy) - Update selectors to match HTML
-            const ic1 = parseFloat(document.getElementById('ic-1')?.value) || 0;
-            const ic2 = parseFloat(document.getElementById('ic-2')?.value) || 0;
-            const ic3 = parseFloat(document.getElementById('ic-3')?.value) || 0;
+            }    
+        
+            // Calculate IC values (distances from centroid to vertices)
+            const ic1 = this.calculateDistance(centroid, this.system.n1);
+            const ic2 = this.calculateDistance(centroid, this.system.n2);
+            const ic3 = this.calculateDistance(centroid, this.system.n3);
+        
+            // Log IC values for debugging
+            console.log('Calculated IC values:', { ic1, ic2, ic3 });
+        
+            // Calculate I-Channel Entropy (HIC) as the sum of IC values
             const hic = ic1 + ic2 + ic3;
-            setElementValue('#system-mch', hic.toFixed(2));
-            
-
-            // Get System Perimeter Entropy (HP) - Update selector to match HTML
+            console.log('Calculated HIC total:', hic);
+        
+            // Set IC values in the input fields
+            setElementValue('#ic-1', ic1.toFixed(2));
+            setElementValue('#ic-2', ic2.toFixed(2));
+            setElementValue('#ic-3', ic3.toFixed(2));
+        
+            // Set HIC value in the dashboard
+            setElementValue('#system-mch', hic.toFixed(2)); // Set the main HIC value
+            setElementValue('#mc-h', hic.toFixed(2));       // Set the alternative HIC display
+        
+            // Get System Perimeter Entropy (HP)
             const hp = parseFloat(document.querySelector('#system-sph')?.value) || 0;
-
-            // Calculate Total System Entropy (H = HP + MCH)
+            console.log('System Perimeter Entropy (HP):', hp);
+                        
+            // Get system capacity (C)
+            const capacity = this.calculateArea();
+            console.log('System Capacity (C):', capacity);
+        
+            // Calculate and set the ratios only if HIC is not zero
+            if (hic !== 0) {
+                if (capacity !== 0) {
+                    // HIC/C ratio
+                    setElementValue('#mch-b-ratio', (hic / capacity).toFixed(4));
+                    setElementValue('#b-mch-ratio', (capacity / hic).toFixed(4));
+                    console.log('Set HIC/C and C/HIC ratios');
+                }
+                            
+                if (hp !== 0) {
+                    // HIC/HP ratio
+                    setElementValue('#hic-hp-ratio', (hic / hp).toFixed(4));
+                    setElementValue('#hp-hic-ratio', (hp / hic).toFixed(4));
+                    console.log('Set HIC/HP and HP/HIC ratios');
+                }
+            } else {
+                console.warn('HIC is zero. Ratios dependent on HIC will not be calculated.');
+            }
+        
+            // Optionally, set Total System Entropy (H = HP + HIC)
             const totalSystemEntropy = hp + hic;
             setElementValue('#system-h', totalSystemEntropy.toFixed(2));
+            console.log('Total System Entropy (H):', totalSystemEntropy);
+
+            
 
             // Get system capacity (C) value - Update selector to match HTML
             const systemCapacity = parseFloat(document.querySelector('#system-c')?.value) || 0;
@@ -1060,8 +1168,7 @@ export class TriangleSystem {
                     `${subcircle.center.x.toFixed(1)}, ${subcircle.center.y.toFixed(1)}`);
             }
 
-            // Calculate new Capacity (C) value using area
-            const capacity = this.calculateArea();
+            
             
             // Update capacity value in System Entropy and Capacity panel
             setElementValue('#system-c', capacity.toFixed(2));  // Keep original ID
@@ -1160,6 +1267,16 @@ export class TriangleSystem {
             if (hp !== 0 && hic !== 0) {
                 // HP/HIC and HIC/HP ratios
                 setElementValue('#hp-hic-ratio', (hp / hic).toFixed(4));
+                setElementValue('#hic-hp-ratio', (hic / hp).toFixed(4));
+            }
+
+            // Add HIC/C ratio calculation
+            if (capacity !== 0 && hic !== 0) {
+                setElementValue('#mch-b-ratio', (hic / capacity).toFixed(4));
+            }
+
+            // HIC/HP ratio is already being set above, but let's ensure it's visible
+            if (hp !== 0 && hic !== 0) {
                 setElementValue('#hic-hp-ratio', (hic / hp).toFixed(4));
             }
 
@@ -1423,13 +1540,35 @@ export class TriangleSystem {
 
             // Calculate and display circumcircle metrics
             const circumcircleMetrics = this.circleMetrics.calculateCircumcircleMetrics();
-            console.log('Received Circumcircle Metrics:', circumcircleMetrics);
-            if (circumcircleMetrics) {
-                this.setElementValue('#circumcircle-area', circumcircleMetrics.area.toFixed(2));
+            let externalMetrics = this.circleMetrics.calculateExternalRegions(); // Changed const to let
+
+            if (circumcircleMetrics && externalMetrics) {
+                // Total Capacity
+                const totalCapacity = circumcircleMetrics.area;
+                const totalUtilization = this.rulesModule.capacityModule.calculateUtilization(totalCapacity);
+                setElementValue('#circumcircle-area', totalCapacity.toFixed(2));
+                setElementValue('#circumcircle-utilization', `${totalUtilization.toFixed(1)}%`);
+
+                // CC1 Region
+                const cc1Capacity = externalMetrics.cc1;
+                const cc1Utilization = this.rulesModule.capacityModule.calculateRegionUtilization('cc1', cc1Capacity);
+                setElementValue('#cc1-area', cc1Capacity.toFixed(2));
+                setElementValue('#cc1-utilization', `${cc1Utilization.toFixed(1)}%`);
+
+                // CC2 Region
+                const cc2Capacity = externalMetrics.cc2;
+                const cc2Utilization = this.rulesModule.capacityModule.calculateRegionUtilization('cc2', cc2Capacity);
+                setElementValue('#cc2-area', cc2Capacity.toFixed(2));
+                setElementValue('#cc2-utilization', `${cc2Utilization.toFixed(1)}%`);
+
+                // CC3 Region
+                const cc3Capacity = externalMetrics.cc3;
+                const cc3Utilization = this.rulesModule.capacityModule.calculateRegionUtilization('cc3', cc3Capacity);
+                setElementValue('#cc3-area', cc3Capacity.toFixed(2));
+                setElementValue('#cc3-utilization', `${cc3Utilization.toFixed(1)}%`);
             }
 
-            // Calculate and display external regions for circumcircle
-            const externalMetrics = this.circleMetrics.calculateExternalRegions();
+            // Calculate and display external regions for circumcircle (duplicate declaration removed)
             if (externalMetrics) {
                 this.setElementValue('#cc1-area', externalMetrics.cc1.toFixed(2));
                 this.setElementValue('#cc2-area', externalMetrics.cc2.toFixed(2));
@@ -4751,139 +4890,77 @@ export class TriangleSystem {
             }
         };
     }
-}
 
-export class RulesModule {
-    constructor(canvas) {
-        this.triangleSystem = new TriangleSystem(canvas);
-        console.log('RulesModule initialized with triangle system:', this.triangleSystem);
-
-        // Initialize batch tracking
-        this.batchTracking = {
-            processedCount: 0,
-            logInterval: 300,
-            channelUpdates: {
-                NC1: { totalDelta: 0, updates: 0 },
-                NC2: { totalDelta: 0, updates: 0 },
-                NC3: { totalDelta: 0, updates: 0 }
-            },
-            startTime: Date.now(),
-            lastLogTime: Date.now()
-        };
-
-        // Track our own channel values
-        this.channelValues = {
-            NC1: this.triangleSystem.system.nc1,
-            NC2: this.triangleSystem.system.nc2,
-            NC3: this.triangleSystem.system.nc3
-        };
-
-        // Listen for intelligence updates
-        document.addEventListener('intelligence-update', (event) => {
-            console.log('Received intelligence update:', event.detail);
-            const { channel, delta } = event.detail;
-            this.updateChannelLength(channel, delta);
-        });
-    }
-    
-    updateChannelLength(channel, delta) {
-        try {
-            // Get current NC values from the triangle's actual state
-            const currentValues = {
-                nc1: Number(document.getElementById('channel-1').value) || 300,
-                nc2: Number(document.getElementById('channel-2').value) || 300,
-                nc3: Number(document.getElementById('channel-3').value) || 300
-            };
-    
-            console.log('Current channel values:', currentValues);
-    
-            // Update the appropriate channel
-            switch(channel) {
-                case 'NC1':
-                    currentValues.nc1 = Math.max(1, currentValues.nc1 + Number(delta));
-                    break;
-                case 'NC2':
-                    currentValues.nc2 = Math.max(1, currentValues.nc2 + Number(delta));
-                    break;
-                case 'NC3':
-                    currentValues.nc3 = Math.max(1, currentValues.nc3 + Number(delta));
-                    break;
-            }
-    
-            console.log('Updating triangle with new values:', currentValues, 
-                '\nChannel:', channel, 
-                '\nDelta:', delta,
-                '\nChange:', {
-                    from: document.getElementById(this.getChannelInputId(channel)).value,
-                    to: currentValues[channel.toLowerCase()]
-                }
-            );
-    
-            // Use the same method that manual inputs use
-            this.triangleSystem.updateTriangleFromEdges(
-                currentValues.nc1,
-                currentValues.nc2,
-                currentValues.nc3
-            );
-    
-            // Update our tracked values
-            this.channelValues = currentValues;
-    
-        } catch (error) {
-            console.error('Error updating triangle:', error, {
-                channel,
-                delta,
-                currentSystem: this.triangleSystem.system
-            });
-        }
-    }
-
-    logBatchReport(currentValues) {
-        const timeElapsed = (Date.now() - this.batchTracking.lastLogTime) / 1000;
+    // Add this method to handle animation presets
+    applyAnimation(animation) {
+        console.log('TriangleSystem.applyAnimation called with:', animation);
         
-        console.log('Triangle NC Update Report:', {
-            updatesProcessed: this.batchTracking.processedCount,
-            timeElapsed: `${timeElapsed.toFixed(2)}s`,
-            updatesPerSecond: (this.batchTracking.processedCount / timeElapsed).toFixed(2),
-            channelUpdates: {
-                NC1: {
-                    totalDelta: this.batchTracking.channelUpdates.NC1.totalDelta,
-                    updateCount: this.batchTracking.channelUpdates.NC1.updates,
-                    currentValue: currentValues.nc1
-                },
-                NC2: {
-                    totalDelta: this.batchTracking.channelUpdates.NC2.totalDelta,
-                    updateCount: this.batchTracking.channelUpdates.NC2.updates,
-                    currentValue: currentValues.nc2
-                },
-                NC3: {
-                    totalDelta: this.batchTracking.channelUpdates.NC3.totalDelta,
-                    updateCount: this.batchTracking.channelUpdates.NC3.updates,
-                    currentValue: currentValues.nc3
-                }
+        if (!animation || !animation.start || !animation.end) {
+            console.error('Invalid animation format');
+            return;
+        }
+
+        // Stop any existing animation
+        if (this.isAnimating) {
+            this.stopAnimation();
+        }
+
+        const duration = 2000; // 2 seconds
+        const startTime = performance.now();
+        this.isAnimating = true;
+
+        const animate = (currentTime) => {
+            if (!this.isAnimating) {
+                console.log('Animation stopped');
+                return;
             }
-        });
-    }
 
-    resetBatchTracking() {
-        this.batchTracking.processedCount = 0;
-        this.batchTracking.channelUpdates = {
-            NC1: { totalDelta: 0, updates: 0 },
-            NC2: { totalDelta: 0, updates: 0 },
-            NC3: { totalDelta: 0, updates: 0 }
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+
+            // Update triangle coordinates
+            this.system.n1.x = this.lerp(animation.start.nc1.x, animation.end.nc1.x, progress);
+            this.system.n2.x = this.lerp(animation.start.nc2.x, animation.end.nc2.x, progress);
+            this.system.n3.x = this.lerp(animation.start.nc3.x, animation.end.nc3.x, progress);
+
+            // Redraw the system
+            this.updateDerivedPoints();
+            this.drawSystem();
+            this.updateDashboard();
+
+            if (progress < 1) {
+                this.animationFrame = requestAnimationFrame(animate);
+            } else if (animation.loop) {
+                // If looping is enabled, restart the animation
+                this.animationFrame = requestAnimationFrame(() => {
+                    this.applyAnimation(animation);
+                });
+            } else {
+                this.isAnimating = false;
+                console.log('Animation completed');
+            }
         };
-        this.batchTracking.lastLogTime = Date.now();
+
+        // Start the animation
+        this.animationFrame = requestAnimationFrame(animate);
     }
 
-    getChannelInputId(channel) {
-        switch(channel) {
-            case 'NC1': return 'channel-1';
-            case 'NC2': return 'channel-2';
-            case 'NC3': return 'channel-3';
-            default: return null;
+    // Helper method for linear interpolation
+    lerp(start, end, progress) {
+        return start + (end - start) * progress;
+    }
+
+    // Method to stop animation
+    stopAnimation() {
+        this.isAnimating = false;
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = null;
         }
     }
 }
+
+
 
 
 
