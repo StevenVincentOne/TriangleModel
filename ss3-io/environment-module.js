@@ -5,6 +5,7 @@ import { CapacityModule } from './capacity-module.js';
 export class EnvironmentModule {
     constructor(intelligenceModule, triangleSystem) {
         this.intelligenceModule = intelligenceModule;
+        this.triangleSystem = triangleSystem;
         this.lossFunction = new LossFunction();
         this.isGenerating = false;
         this.generationInterval = null;
@@ -27,10 +28,20 @@ export class EnvironmentModule {
             }
         };
 
+        this.environmentalData = new EnvironmentalData();
+        this.dashboardElements = {};
+        this.initializeDashboardElements();
         this.initializeControls();
-        console.log('EnvironmentModule initialized with weighted letter distribution');
-        console.log('Total letter pool size:', this.alphabet.length);
-        console.log('Intelligence module connected:', this.intelligenceModule ? 'yes' : 'no');
+        
+        // Initialize environmental data right after setup
+        this.initializeEnvironmentalData();
+        
+        // Add debug logging
+        console.log('Environment Module initialized with:', {
+            cc: this.getCC(),
+            ed: this.environmentalData.environmentalData,
+            ccu: this.calculateCCU()
+        });
 
         // Add zero data button handler
         const zeroDataButton = document.getElementById('zeroDataButton');
@@ -47,6 +58,27 @@ export class EnvironmentModule {
 
         this.circleMetrics = new CircleMetrics(triangleSystem);
         this.capacityModule = new CapacityModule(this.circleMetrics);
+
+        // Add EN flow rate handler
+        const enRateInput = document.getElementById('en-flow-rate');
+        if (enRateInput) {
+            enRateInput.value = this.enFlowRate;
+            
+            // Handle both input and keypress events
+            enRateInput.addEventListener('input', (e) => {
+                const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                this.updateENFlowRate(newRate);
+            });
+
+            enRateInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent default to avoid form submission
+                    const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                    this.updateENFlowRate(newRate);
+                    enRateInput.blur(); // Remove focus from input
+                }
+            });
+        }
     }
 
     initializeControls() {
@@ -82,27 +114,6 @@ export class EnvironmentModule {
                 const newRate = Math.min(1000, Math.max(0, parseInt(e.target.value) || 0));
                 console.log('Parsed new rate:', newRate);
                 this.updateFlowRate(newRate);
-            });
-        }
-
-        // Add handlers for EN flow rate
-        const enRateInput = document.getElementById('en-flow-rate');
-        if (enRateInput) {
-            enRateInput.value = this.enFlowRate;
-            
-            // Handle both input and keypress events
-            enRateInput.addEventListener('input', (e) => {
-                const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
-                this.updateENFlowRate(newRate);
-            });
-
-            enRateInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault(); // Prevent default to avoid form submission
-                    const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
-                    this.updateENFlowRate(newRate);
-                    enRateInput.blur(); // Remove focus from input
-                }
             });
         }
 
@@ -240,5 +251,147 @@ export class EnvironmentModule {
             const letter = this.randomGenerator.generateLetter();
             this.intelligenceModule.processLetter(letter);
         }
+    }
+
+    initializeDashboardElements() {
+        this.dashboardElements = {
+            environmentalData: document.getElementById('system-ed'),
+            environmentalBits: document.getElementById('system-eb'),
+            environmentalNoise: document.getElementById('system-en'),
+            circumcircleArea: document.getElementById('circumcircle-area'),
+            circumcircleUtilization: document.getElementById('circumcircle-utilization'),
+            cc1Area: document.getElementById('cc1-area'),
+            cc1Utilization: document.getElementById('cc1-utilization'),
+            cc2Area: document.getElementById('cc2-area'),
+            cc2Utilization: document.getElementById('cc2-utilization'),
+            cc3Area: document.getElementById('cc3-area'),
+            cc3Utilization: document.getElementById('cc3-utilization')
+        };
+    }
+
+    initializeEnvironmentalData() {
+        const metrics = this.triangleSystem.circleMetrics.calculateExternalRegions();
+        if (metrics) {
+            // Set ED to 50% of CC (total external area)
+            const cc = metrics.totalExternal;
+            this.environmentalData.environmentalData = cc * 0.5;
+            
+            // Initialize CC1-3 data at 50% of their respective capacities
+            this.environmentalData.cc1Data = metrics.cc1 * 0.5;
+            this.environmentalData.cc2Data = metrics.cc2 * 0.5;
+            this.environmentalData.cc3Data = metrics.cc3 * 0.5;
+            
+            this.updateDashboard();
+        }
+    }
+
+    updateDashboard() {
+        const metrics = this.triangleSystem.circleMetrics.calculateExternalRegions();
+        if (metrics) {
+            // Update CC and CCU
+            const cc = metrics.totalExternal;
+            const ccu = this.calculateCCU();
+
+            if (this.dashboardElements.circumcircleArea) {
+                this.dashboardElements.circumcircleArea.value = cc.toFixed(2);
+            }
+            if (this.dashboardElements.circumcircleUtilization) {
+                this.dashboardElements.circumcircleUtilization.value = `${ccu.toFixed(1)}%`;
+            }
+
+            // Update CC1-3 areas and utilizations
+            if (this.dashboardElements.cc1Area) {
+                this.dashboardElements.cc1Area.value = metrics.cc1.toFixed(2);
+            }
+            if (this.dashboardElements.cc1Utilization) {
+                const cc1u = (this.environmentalData.cc1Data / metrics.cc1) * 100;
+                this.dashboardElements.cc1Utilization.value = `${cc1u.toFixed(1)}%`;
+            }
+
+            if (this.dashboardElements.cc2Area) {
+                this.dashboardElements.cc2Area.value = metrics.cc2.toFixed(2);
+            }
+            if (this.dashboardElements.cc2Utilization) {
+                const cc2u = (this.environmentalData.cc2Data / metrics.cc2) * 100;
+                this.dashboardElements.cc2Utilization.value = `${cc2u.toFixed(1)}%`;
+            }
+
+            if (this.dashboardElements.cc3Area) {
+                this.dashboardElements.cc3Area.value = metrics.cc3.toFixed(2);
+            }
+            if (this.dashboardElements.cc3Utilization) {
+                const cc3u = (this.environmentalData.cc3Data / metrics.cc3) * 100;
+                this.dashboardElements.cc3Utilization.value = `${cc3u.toFixed(1)}%`;
+            }
+
+            // Update Environmental Data values
+            if (this.dashboardElements.environmentalData) {
+                this.dashboardElements.environmentalData.value = 
+                    this.environmentalData.environmentalData.toFixed(2);
+            }
+            if (this.dashboardElements.environmentalBits) {
+                this.dashboardElements.environmentalBits.value = 
+                    this.environmentalData.environmentalBits.toFixed(2);
+            }
+            if (this.dashboardElements.environmentalNoise) {
+                this.dashboardElements.environmentalNoise.value = 
+                    this.environmentalData.environmentalNoise.toFixed(2);
+            }
+        }
+    }
+
+    getCC() {
+        const metrics = this.triangleSystem.circleMetrics.calculateExternalRegions();
+        return metrics ? metrics.totalExternal : 0;
+    }
+
+    calculateCCU() {
+        const cc = this.getCC();
+        if (cc === 0) return 0;
+        return (this.environmentalData.environmentalData / cc) * 100;
+    }
+}
+
+class EnvironmentalData {
+    constructor() {
+        this._environmentalData = 0;  // ED
+        this._environmentalBits = 0;   // EB
+        this._environmentalNoise = 0;  // EN
+        this.cc1Data = 0;
+        this.cc2Data = 0;
+        this.cc3Data = 0;
+    }
+
+    get environmentalData() {
+        return this._environmentalData;
+    }
+
+    set environmentalData(value) {
+        this._environmentalData = Math.max(0, value);
+        // When ED is set, distribute it equally between EB and EN
+        this._environmentalBits = this._environmentalData * 0.5;
+        this._environmentalNoise = this._environmentalData * 0.5;
+    }
+
+    get environmentalBits() {
+        return this._environmentalBits;
+    }
+
+    get environmentalNoise() {
+        return this._environmentalNoise;
+    }
+
+    set environmentalBits(value) {
+        this._environmentalBits = Math.max(0, value);
+        this.recalculateED();
+    }
+
+    set environmentalNoise(value) {
+        this._environmentalNoise = Math.max(0, value);
+        this.recalculateED();
+    }
+
+    recalculateED() {
+        this._environmentalData = this._environmentalBits + this._environmentalNoise;
     }
 } 

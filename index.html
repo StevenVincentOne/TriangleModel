@@ -167,31 +167,15 @@
                         </div>
                     </div>
 
-                    <!-- System Intelligence Inputs -->
+                    <!-- System Internal Data Controls -->
                     <div class="system-intelligence-inputs mt-3">
                         <div class="input-row">
-                            <label for="system-d">Total Data (D)</label>
-                            <input type="text" id="system-d" readonly>
-                        </div>
-                        <div class="input-row">
                             <label for="system-net-d">Net D</label>
-                            <input type="text" id="system-net-d" readonly>
+                            <input id="system-net-d" type="text" readonly>
                         </div>
                         <div class="input-row">
-                            <label for="system-converted">Converted D</label>
-                            <input type="text" id="system-converted" readonly>
-                        </div>
-                        <div class="input-row">
-                            <label for="system-b">Bits (B)</label>
-                            <input type="text" id="system-b" readonly>
-                        </div>
-                        <div class="input-row">
-                            <label for="system-n">Noise (N)</label>
-                            <input type="text" id="system-n" readonly>
-                        </div>
-                        <div class="input-row">
-                            <label for="system-bn-ratio">B/N</label>
-                            <input type="text" id="system-bn-ratio" readonly>
+                            <label for="system-converted">Conv D</label>
+                            <input id="system-converted" type="text" readonly>
                         </div>
                         <div class="input-row">
                             <label for="flow-rate">D Flow</label>
@@ -207,12 +191,7 @@
                                    id="data-reduction" 
                                    min="0" 
                                    max="100" 
-                                   step="0.1"> 
-                                  
-                        </div>
-                        <div class="input-row">
-                            <label for="system-en">EN</label>
-                            <input type="text" id="system-en" readonly>
+                                   step="0.1">    
                         </div>
                         <div class="input-row">
                             <label for="en-flow-rate">EN Flow</label>
@@ -294,7 +273,7 @@
             <div class="dashboard-panel">
                 <h3 class="panel-header">System Environment</h3>
                 <div class="panel-content">
-                    <!-- Circumcircle Row -->
+                    <!-- Circumcircle Capacity Row -->
                     <div class="panel-row">
                         <div class="label-value-pair">
                             <label>CC</label>
@@ -329,6 +308,22 @@
                             <input id="cc3-utilization" class="env-input" type="text" readonly>
                         </div>
                     </div>
+                    
+                    <!-- System Environment Panel -->
+                    <div class="panel-row">
+                        <div class="label-value-pair">
+                            <label for="system-ed">ED</label>
+                            <input type="text" id="system-ed" class="env-input" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label for="system-eb">EB</label>
+                            <input type="text" id="system-eb" class="env-input" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label for="system-en">EN</label>
+                            <input type="text" id="system-en" class="env-input" readonly>
+                        </div>
+                    </div>
                     <!-- 9 Point Circle Row -->
                     <div class="panel-row">
                         <div class="label-value-pair">
@@ -351,53 +346,76 @@
                 </div>
             </div>
             
-            <!-- System State Panel -->
+            <!-- Triangle System State Panel -->
             <div class="dashboard-panel">
-                <h3 class="panel-header">System State</h3>
+                <h3 class="panel-header">Triangle System State</h3>
                 <div class="panel-content">
-                    <!-- Main Values Section -->
-                    <div class="value-section">
-                        <div class="panel-row">
-                            <div class="label-value-pair">
-                                <label>H</label>
-                                <input id="system-h" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>HP</label>
-                                <input id="system-sph" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>HIC</label>
-                                <input id="system-mch" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label>C</label>
-                                <input id="system-c" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="sh-b-ratio">H/C</label>
-                                <input id="sh-b-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="sph-area-ratio">HP/C</label>
-                                <input id="sph-area-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="mch-b-ratio">HIC/C</label>
-                                <input id="mch-b-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="hic-hp-ratio">HIC/HP</label>
-                                <input id="hic-hp-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="hp-h-ratio">HP/H</label>
-                                <input id="hp-h-ratio" type="text" readonly>
-                            </div>
-                            <div class="label-value-pair">
-                                <label for="hic-h-ratio">HIC/H</label>
-                                <input id="hic-h-ratio" type="text" readonly>
-                            </div>
+                    <!-- Triangle Capacity row -->
+                    <div class="panel-row">
+                        <div class="label-value-pair">
+                            <label>C</label>
+                            <input id="system-c" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>SD</label>
+                            <input id="system-d" type="text" readonly>
+                        </div>
+                        
+                        <div class="label-value-pair">
+                            <label>SB</label>
+                            <input id="system-b" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>SN</label>
+                            <input id="system-n" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>SB/SN</label>
+                            <input id="system-bn-ratio" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>ssc</label>
+                            <input id="subsystem-1-area" type="text" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Triangle Entropy row -->
+                    <div class="panel-row">
+                        <div class="label-value-pair">
+                            <label>H</label>
+                            <input id="system-h" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>HP</label>
+                            <input id="system-sph" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>HIC</label>
+                            <input id="system-mch" type="text" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Triangle Ratios row -->
+                    <div class="panel-row">
+                        <div class="label-value-pair">
+                            <label>H/C</label>
+                            <input id="sh-b-ratio" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>HIC/C</label>
+                            <input id="mch-b-ratio" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>HIC/HP</label>
+                            <input id="hic-hp-ratio" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>HP/H</label>
+                            <input id="hp-h-ratio" type="text" readonly>
+                        </div>
+                        <div class="label-value-pair">
+                            <label>HIC/H</label>
+                            <input id="hic-h-ratio" type="text" readonly>
                         </div>
                     </div>
                 </div>

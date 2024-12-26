@@ -18,12 +18,11 @@ export class IntelligenceModule {
             totalUnprocessed: 0   // Total unprocessed letters
         };
         this.entropyState = {
-            totalLetters: 0,      // Total Data (D)
-            netLetters: 0,        // Net Data
-            totalWords: 0,        // Total Bits (B)
-            totalEntropy: 0,      // Total Entropy (E)
-            convertedData: 0,      // Data converted to B or E
-            environmentalNoise: 0  // Add EN counter
+            totalLetters: 0,
+            netLetters: 0,
+            convertedData: 0,
+            totalWords: 0,
+            totalEntropy: 0
         };
 
         // Add intelligence toggle listener
@@ -223,14 +222,12 @@ export class IntelligenceModule {
         const systemB = document.getElementById('system-b');
         const systemN = document.getElementById('system-n');
         const systemBNRatio = document.getElementById('system-bn-ratio');
-        const systemEN = document.getElementById('system-en');
 
         if (systemD) systemD.value = this.entropyState.totalLetters;
         if (systemNetD) systemNetD.value = this.entropyState.netLetters;
         if (systemConverted) systemConverted.value = this.entropyState.convertedData;
         if (systemB) systemB.value = this.entropyState.totalWords;
         if (systemN) systemN.value = this.entropyState.totalEntropy;
-        if (systemEN) systemEN.value = this.entropyState.environmentalNoise;
         
         if (systemBNRatio) {
             if (this.entropyState.totalEntropy === 0) {
@@ -247,7 +244,7 @@ export class IntelligenceModule {
         console.log('Initializing clean system state...');
         // Reset all counts
         this.letterPool = { groups: {}, totalUnprocessed: 0 };
-        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0, convertedData: 0, environmentalNoise: 0 };
+        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0, convertedData: 0 };
         console.log('System initialized with clean state:', this.entropyState);
     }
 
@@ -261,8 +258,7 @@ export class IntelligenceModule {
             netLetters: 0,
             totalWords: 0,
             totalEntropy: 0,
-            convertedData: 0,
-            environmentalNoise: 0
+            convertedData: 0
         };
 
         // Update the dashboard
@@ -271,20 +267,11 @@ export class IntelligenceModule {
         console.log('Data reset complete:', this.entropyState);
     }
 
-    // New method to process Environmental Noise
+    // Keep this method for processing EN from EnvironmentModule
     processEN(noise) {
-        console.log(`Processing Environmental Noise: "${noise}"`);
-        this.entropyState.environmentalNoise++;
-        this.entropyState.totalEntropy++; // EN contributes to total entropy
-        
-        // Dispatch entropy update for EN
-        const mapping = this.nodeChannelEntropy.bitToEntropyMapping[noise] || 
-                       { channel: 'NC' + (Math.floor(Math.random() * 3) + 1) };
-        
-        if (this.intelligenceEnabled) {
-            this.dispatchIntelligenceUpdate(mapping.channel, +1, 'entropy');
+        if (noise) {
+            this.entropyState.totalEntropy++;
+            this.updateDashboard();
         }
-
-        this.updateDashboard();
     }
 } 

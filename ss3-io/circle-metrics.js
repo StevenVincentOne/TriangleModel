@@ -16,10 +16,20 @@ export class CircleMetrics {
                 return null;
             }
             
-            const area = Math.PI * Math.pow(circumcircle.radius, 2);
+            // Get external regions
+            const externalRegions = this.calculateExternalRegions();
+            if (!externalRegions) {
+                return null;
+            }
+
             return {
-                area: area,
-                circumference: 2 * Math.PI * circumcircle.radius
+                // Total external area (CC) is the sum of CC1, CC2, CC3
+                area: externalRegions.totalExternal,
+                circumference: 2 * Math.PI * circumcircle.radius,
+                // Include individual regions for reference
+                cc1: externalRegions.cc1,
+                cc2: externalRegions.cc2,
+                cc3: externalRegions.cc3
             };
         } catch (error) {
             console.error('Error calculating circumcircle metrics:', error);

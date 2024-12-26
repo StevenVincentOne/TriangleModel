@@ -1540,40 +1540,7 @@ export class TriangleSystem {
 
             // Calculate and display circumcircle metrics
             const circumcircleMetrics = this.circleMetrics.calculateCircumcircleMetrics();
-            let externalMetrics = this.circleMetrics.calculateExternalRegions(); // Changed const to let
-
-            if (circumcircleMetrics && externalMetrics) {
-                // Total Capacity
-                const totalCapacity = circumcircleMetrics.area;
-                const totalUtilization = this.rulesModule.capacityModule.calculateUtilization(totalCapacity);
-                setElementValue('#circumcircle-area', totalCapacity.toFixed(2));
-                setElementValue('#circumcircle-utilization', `${totalUtilization.toFixed(1)}%`);
-
-                // CC1 Region
-                const cc1Capacity = externalMetrics.cc1;
-                const cc1Utilization = this.rulesModule.capacityModule.calculateRegionUtilization('cc1', cc1Capacity);
-                setElementValue('#cc1-area', cc1Capacity.toFixed(2));
-                setElementValue('#cc1-utilization', `${cc1Utilization.toFixed(1)}%`);
-
-                // CC2 Region
-                const cc2Capacity = externalMetrics.cc2;
-                const cc2Utilization = this.rulesModule.capacityModule.calculateRegionUtilization('cc2', cc2Capacity);
-                setElementValue('#cc2-area', cc2Capacity.toFixed(2));
-                setElementValue('#cc2-utilization', `${cc2Utilization.toFixed(1)}%`);
-
-                // CC3 Region
-                const cc3Capacity = externalMetrics.cc3;
-                const cc3Utilization = this.rulesModule.capacityModule.calculateRegionUtilization('cc3', cc3Capacity);
-                setElementValue('#cc3-area', cc3Capacity.toFixed(2));
-                setElementValue('#cc3-utilization', `${cc3Utilization.toFixed(1)}%`);
-            }
-
-            // Calculate and display external regions for circumcircle (duplicate declaration removed)
-            if (externalMetrics) {
-                this.setElementValue('#cc1-area', externalMetrics.cc1.toFixed(2));
-                this.setElementValue('#cc2-area', externalMetrics.cc2.toFixed(2));
-                this.setElementValue('#cc3-area', externalMetrics.cc3.toFixed(2));
-            }
+            let externalMetrics = this.circleMetrics.calculateExternalRegions();
 
             // Calculate and display nine-point circle metrics
             const metrics = this.circleMetrics.calculateNinePointCircleMetrics();
