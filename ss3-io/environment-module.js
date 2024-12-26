@@ -79,6 +79,20 @@ export class EnvironmentModule {
                 }
             });
         }
+
+        // Add observer to triangle system's dashboard updates
+        if (this.triangleSystem) {
+            const originalUpdateDashboard = this.triangleSystem.updateDashboard.bind(this.triangleSystem);
+            this.triangleSystem.updateDashboard = () => {
+                originalUpdateDashboard();
+                try {
+                    // After triangle updates its dashboard, update our CC values
+                    this.updateCircleCapacities();
+                } catch (error) {
+                    console.warn('Error updating circle capacities:', error);
+                }
+            };
+        }
     }
 
     initializeControls() {
@@ -349,6 +363,51 @@ export class EnvironmentModule {
         const cc = this.getCC();
         if (cc === 0) return 0;
         return (this.environmentalData.environmentalData / cc) * 100;
+    }
+
+    // New method to update only CC values
+    updateCircleCapacities() {
+        try {
+            const metrics = this.triangleSystem?.circleMetrics?.calculateExternalRegions();
+            if (!metrics) {
+                console.warn('No metrics available');
+                return;
+            }
+
+            console.log('Metrics:', metrics); // Debug log to see all available properties
+            console.log('Metrics properties:', Object.keys(metrics)); // Show all property names
+            
+            // Match exact HTML IDs
+            const elements = {
+                cc: document.getElementById('circumcircle-area'),
+                cc1: document.getElementById('cc1-area'),
+                cc2: document.getElementById('cc2-area'),
+                cc3: document.getElementById('cc3-area')
+            };
+
+            if (elements.cc) {
+                elements.cc.value = (metrics.totalExternal || 0).toFixed(2);
+            }
+            if (elements.cc1) {
+                elements.cc1.value = (metrics.cc1 || 0).toFixed(2);  // Try cc1 instead of np1
+            }
+            if (elements.cc2) {
+                elements.cc2.value = (metrics.cc2 || 0).toFixed(2);  // Try cc2 instead of np2
+            }
+            if (elements.cc3) {
+                elements.cc3.value = (metrics.cc3 || 0).toFixed(2);  // Try cc3 instead of np3
+            }
+
+            console.log('Updated values:', {
+                cc: elements.cc?.value,
+                cc1: elements.cc1?.value,
+                cc2: elements.cc2?.value,
+                cc3: elements.cc3?.value
+            });
+            
+        } catch (error) {
+            console.warn('Error in updateCircleCapacities:', error);
+        }
     }
 }
 
