@@ -1,7 +1,9 @@
 export class LossFunction {
     constructor() {
         this.lossFactors = {
-            inputLoss: 0.0  // Set to 0 for testing
+            inputLoss: 0.0,    // Existing D loss factor
+            bitsLoss: 0.0,     // New B loss factor (processing cost)
+            noiseGain: 0.0     // New N gain factor (processing errors)
         };
 
         // English to Greek mapping
@@ -63,6 +65,68 @@ export class LossFunction {
             console.log('Loss factor updated to:', `${this.lossFactors.inputLoss * 100}%`);
         }
     }
+
+    // Get/Set methods for new factors
+    getBitsLossFactor() {
+        return this.lossFactors.bitsLoss;
+    }
+
+    setBitsLossFactor(value) {
+        if (value >= 0 && value <= 1) {
+            this.lossFactors.bitsLoss = value;
+            console.log('Bits loss factor updated to:', `${this.lossFactors.bitsLoss * 100}%`);
+        }
+    }
+
+    getNoiseGainFactor() {
+        return this.lossFactors.noiseGain;
+    }
+
+    setNoiseGainFactor(value) {
+        if (value >= 0 && value <= 1) {
+            this.lossFactors.noiseGain = value;
+            console.log('Noise gain factor updated to:', `${this.lossFactors.noiseGain * 100}%`);
+        }
+    }
+
+    // Process incoming environmental data with all loss/gain factors
+    processData(data) {
+        const result = {
+            originalBits: data.bits,
+            originalNoise: data.noise,
+            processedBits: data.bits,
+            processedNoise: data.noise,
+            lostBits: 0,
+            gainedNoise: 0
+        };
+
+        // Apply processing cost (B loss)
+        const bitsLost = Math.floor(result.processedBits * this.lossFactors.bitsLoss);
+        result.processedBits -= bitsLost;
+        result.lostBits = bitsLost;
+
+        // Apply processing errors (N gain)
+        const noiseGained = Math.floor(result.processedBits * this.lossFactors.noiseGain);
+        result.processedNoise += noiseGained;
+        result.gainedNoise = noiseGained;
+
+        // Apply existing input loss
+        const inputLoss = Math.floor(result.processedBits * this.lossFactors.inputLoss);
+        result.processedBits -= inputLoss;
+        result.processedNoise += inputLoss;
+
+        console.log('Processing Results:', {
+            original: { bits: result.originalBits, noise: result.originalNoise },
+            processed: { bits: result.processedBits, noise: result.processedNoise },
+            changes: { 
+                lostBits: result.lostBits,
+                gainedNoise: result.gainedNoise,
+                inputLoss: inputLoss
+            }
+        });
+
+        return result;
+    }
 }
 
 export class NodeChannelEntropy {
@@ -105,4 +169,108 @@ export class NodeChannelEntropy {
     }
 
     // Removed processLetter as it's handled by IntelligenceModule
+}
+export class DataProcessing {
+    constructor(environmentModule) {
+        this.environmentModule = environmentModule;
+        this.lossFunction = new LossFunction();
+        this.nodeChannelEntropy = new NodeChannelEntropy();
+        this.isProcessing = false;
+        
+        // Add processing data pool
+        this.processingPool = {
+            totalData: 0,      // PD (Process Data)
+            processBits: 0,    // PB (Process Bits)
+            processNoise: 0,   // PN (Process Noise)
+            unprocessed: 0     // Data waiting to be processed
+        };
+
+        // Initialize dashboard elements
+        this.initializeDashboardElements();
+    }
+
+    initializeDashboardElements() {
+        this.dashboardElements = {
+            processData: document.getElementById('process-d'),
+            processBits: document.getElementById('process-b'),
+            processNoise: document.getElementById('process-n')
+        };
+        
+        console.log('Data Processing Dashboard Elements:', this.dashboardElements); // Debug log
+    }
+
+    startDataFlow() {
+        if (this.isProcessing) return;
+        
+        this.isProcessing = true;
+        
+        // Get environmental data
+        const envData = {
+            bits: this.environmentModule.environmentalData.environmentalBits,
+            noise: this.environmentModule.environmentalData.environmentalNoise
+        };
+
+        console.log('Processing environmental data:', envData);
+
+        // Process incoming environmental data
+        this.processEnvironmentalData(envData);
+    }
+
+    processData(data) {
+        // Decrement from environmental pool
+        this.environmentModule.environmentalData.environmentalBits--;
+        
+        // Increment processing pool
+        this.processingPool.unprocessed++;
+        this.processingPool.totalData++;
+        
+        // Process through loss function
+        const processedData = this.lossFunction.processData(data);
+        
+        // Update processing pool based on loss function results
+        if (processedData) {
+            this.processingPool.processBits += processedData.processedBits;
+            this.processingPool.processNoise += processedData.processedNoise;
+            this.processingPool.unprocessed--;
+        }
+        
+        // Update dashboard
+        this.updateDashboard();
+        
+        // If intelligence module exists, add to data pool
+        if (this.environmentModule.intelligenceModule) {
+            this.environmentModule.intelligenceModule.addToDataPool(data.letter);
+        }
+
+        console.log('Processing pool state:', this.processingPool);
+        return processedData;
+    }
+
+    updateDashboard() {
+        if (this.dashboardElements.processData) {
+            this.dashboardElements.processData.value = this.processingPool.totalData.toFixed(2);
+        }
+        if (this.dashboardElements.processBits) {
+            this.dashboardElements.processBits.value = this.processingPool.processBits.toFixed(2);
+        }
+        if (this.dashboardElements.processNoise) {
+            this.dashboardElements.processNoise.value = this.processingPool.processNoise.toFixed(2);
+        }
+    }
+
+    processEnvironmentalData(envData) {
+        // Apply loss function to incoming data
+        const processedData = this.lossFunction.processData(envData);
+        
+        // Process through node channels
+        this.nodeChannelEntropy.processData(processedData);
+
+        console.log('Processed data:', processedData);
+        
+        return processedData;
+    }
+
+    stopDataFlow() {
+        this.isProcessing = false;
+    }
 }
