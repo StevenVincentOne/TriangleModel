@@ -521,5 +521,133 @@ class TriangleDatabase {
     }
 }
 
+export class EnvironmentDatabase {
+    constructor() {
+        this.dbName = 'TriangleSystemDB';
+        this.version = 1;
+        this.db = null;
+        this.initDatabase();
+    }
+
+    async initDatabase() {
+        try {
+            const request = indexedDB.open(this.dbName, this.version);
+
+            request.onerror = (event) => {
+                console.error('Database error:', event.target.error);
+            };
+
+            request.onupgradeneeded = (event) => {
+                const db = event.target.result;
+
+                // Create object stores if they don't exist
+                if (!db.objectStoreNames.contains('environmentalPool')) {
+                    const environmentalStore = db.createObjectStore('environmentalPool', { keyPath: 'id' });
+                    environmentalStore.createIndex('type', 'type', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('triangleSystemPool')) {
+                    const triangleStore = db.createObjectStore('triangleSystemPool', { keyPath: 'id' });
+                    triangleStore.createIndex('type', 'type', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('simulationStates')) {
+                    const statesStore = db.createObjectStore('simulationStates', { keyPath: 'timestamp' });
+                    statesStore.createIndex('name', 'name', { unique: false });
+                }
+
+                if (!db.objectStoreNames.contains('flowMetrics')) {
+                    const metricsStore = db.createObjectStore('flowMetrics', { keyPath: 'timestamp' });
+                    metricsStore.createIndex('type', 'type', { unique: false });
+                }
+            };
+
+            request.onsuccess = (event) => {
+                this.db = event.target.result;
+                console.log('Environment Database initialized successfully');
+            };
+        } catch (error) {
+            console.error('Error initializing environment database:', error);
+        }
+    }
+
+    // Store environmental data pool
+    async storeEnvironmentalPool(data) {
+        try {
+            const transaction = this.db.transaction(['environmentalPool'], 'readwrite');
+            const store = transaction.objectStore('environmentalPool');
+            
+            await store.put({
+                id: 'currentPool',
+                type: 'environmental',
+                bits: data.bits,
+                noise: data.noise,
+                metrics: data.metrics,
+                timestamp: Date.now()
+            });
+
+            return true;
+        } catch (error) {
+            console.error('Error storing environmental pool:', error);
+            return false;
+        }
+    }
+
+    // Retrieve environmental data pool
+    async getEnvironmentalPool() {
+        try {
+            const transaction = this.db.transaction(['environmentalPool'], 'readonly');
+            const store = transaction.objectStore('environmentalPool');
+            const request = store.get('currentPool');
+
+            return new Promise((resolve, reject) => {
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error retrieving environmental pool:', error);
+            return null;
+        }
+    }
+
+    // Store simulation state
+    async saveSimulationState(state, name = 'default') {
+        try {
+            const transaction = this.db.transaction(['simulationStates'], 'readwrite');
+            const store = transaction.objectStore('simulationStates');
+            
+            await store.put({
+                timestamp: Date.now(),
+                name,
+                environmentalPool: state.environmentalPool,
+                triangleSystemPool: state.triangleSystemPool,
+                metrics: state.metrics
+            });
+
+            return true;
+        } catch (error) {
+            console.error('Error saving simulation state:', error);
+            return false;
+        }
+    }
+
+    // Load simulation state
+    async loadSimulationState(timestamp) {
+        try {
+            const transaction = this.db.transaction(['simulationStates'], 'readonly');
+            const store = transaction.objectStore('simulationStates');
+            const request = store.get(timestamp);
+
+            return new Promise((resolve, reject) => {
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error loading simulation state:', error);
+            return null;
+        }
+    }
+}
+
 // Export the class
 export { TriangleDatabase };

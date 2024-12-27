@@ -1,18 +1,8 @@
+import { EnvironmentDatabase } from '../shared/ui/database.js';
+
 export class CapacityModule {
-    constructor(circumcircleMetrics) {
-        this.metrics = circumcircleMetrics;
-
-        // Capacity parameters
-        this.capacityUtilization = 50;
-        this.dataAvailability = 7;
-        this.totalDataBalance = 0.5;
-        this.nodeChannelBalance = {
-            cc1: 0.5,
-            cc2: 0.5,
-            cc3: 0.5
-        };
-
-        // Single unified symbol pool instead of region-specific groups
+    constructor(circleMetrics) {
+        this.metrics = circleMetrics;
         this.symbolPool = {
             bits: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
                 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
@@ -21,109 +11,125 @@ export class CapacityModule {
                 'κ', 'λ', 'μ', 'ν', 'ο', 'π', 'ψ', 'ρ', 'σ',
                 'τ', 'υ', 'ϑ', 'ω', 'χ', 'ψ', 'ζ', 'ς', 'Σ', 'Ω', 'θ']
         };
-    }
-
-    calculateUtilization(totalCapacity) {
-        // Calculate actual data content as percentage of capacity
-        const actualData = this.getCurrentDataCount();
-        return (actualData / totalCapacity) * 100 * this.capacityUtilization;
-    }
-
-    calculateRegionUtilization(region, capacity) {
-        // Calculate actual data content in specific region
-        const regionData = this.getCurrentRegionDataCount(region);
-        return (regionData / capacity) * 100 * this.nodeChannelBalance[region];
-    }
-
-    getCurrentDataCount() {
-        // Count total bits and noise currently in the environment
-        let totalCount = 0;
-        for (const region of ['cc1', 'cc2', 'cc3']) {
-            const data = this.generateEnvironmentalData(region);
-            totalCount += data.bits.length + data.noise.length;
-        }
-        return totalCount;
-    }
-
-    getCurrentRegionDataCount(region) {
-        // Count bits and noise in specific region
-        const data = this.generateEnvironmentalData(region);
-        return data.bits.length + data.noise.length;
-    }
-
-    calculateAvailableCapacity(region) {
-        const metrics = this.metrics.calculateExternalRegions();
-        if (!metrics) return 0;
-
-        const totalCapacity = metrics[region] * (this.capacityUtilization / 100);
-        return totalCapacity * (this.dataAvailability / 10);
-    }
-
-    generateEnvironmentalData(region) {
-        const capacity = this.calculateAvailableCapacity(region);
-        const balance = this.nodeChannelBalance[region];
-
-        const bitsCount = Math.floor(capacity * balance);
-        const noiseCount = Math.floor(capacity * (1 - balance));
-
-        return {
-            bits: this.generateSymbols('bits', bitsCount),
-            noise: this.generateSymbols('noise', noiseCount)
-        };
+        this.environmentDB = new EnvironmentDatabase();
     }
 
     generateSymbols(type, count) {
         const symbols = this.symbolPool[type];
-        const result = [];
+        if (!symbols) {
+            console.error(`Invalid symbol type: ${type}`);
+            return [];
+        }
 
+        const result = [];
         for (let i = 0; i < count; i++) {
             const randomIndex = Math.floor(Math.random() * symbols.length);
             result.push(symbols[randomIndex]);
         }
-
         return result;
     }
 
-    introduceDisturbance(params = {}) {
-        const {
-            duration = 5000,  // Duration in milliseconds
-            intensity = 0.5,  // 0-1 scale
-            type = 'random'   // 'random', 'bits-surge', 'noise-surge', 'capacity-drop'
-        } = params;
+    async initializeSystemData() {
+        try {
+            // Get the latest metrics
+            const metrics = this.metrics.calculateExternalRegions();
+            if (!metrics) {
+                throw new Error('No metrics available');
+            }
 
-        const originalState = {
-            capacityUtilization: this.capacityUtilization,
-            dataAvailability: this.dataAvailability,
-            totalDataBalance: this.totalDataBalance,
-            nodeChannelBalance: { ...this.nodeChannelBalance }
-        };
+            // Calculate total capacity based on circumcircle metrics
+            const totalCapacity = metrics.totalExternal || 0;
+            
+            // Generate random utilization percentages (50-90%)
+            const ccuTotal = Math.random() * 40 + 50;
+            const ccu1 = Math.random() * 40 + 50;
+            const ccu2 = Math.random() * 40 + 50;
+            const ccu3 = Math.random() * 40 + 50;
 
-        switch (type) {
-            case 'bits-surge':
-                this.totalDataBalance = Math.min(1, this.totalDataBalance + intensity * 0.5);
-                break;
-            case 'noise-surge':
-                this.totalDataBalance = Math.max(0, this.totalDataBalance - intensity * 0.5);
-                break;
-            case 'capacity-drop':
-                this.capacityUtilization *= (1 - intensity);
-                this.dataAvailability *= (1 - intensity);
-                break;
-            case 'random':
-                this.introduceRandomDisturbance(intensity);
-                break;
+            // Calculate actual capacities
+            const usedCapacity = totalCapacity * (ccuTotal / 100);
+            const cc1Capacity = metrics.cc1 * (ccu1 / 100);
+            const cc2Capacity = metrics.cc2 * (ccu2 / 100);
+            const cc3Capacity = metrics.cc3 * (ccu3 / 100);
+
+            // Generate random B/N ratio (30-70% bits)
+            const bitsRatio = Math.random() * 40 + 30;
+            
+            // Calculate pool sizes
+            const totalBits = Math.floor(usedCapacity * (bitsRatio / 100));
+            const totalNoise = Math.floor(usedCapacity * ((100 - bitsRatio) / 100));
+
+            // Generate symbol pools
+            const bitsPool = this.generateSymbols('bits', totalBits);
+            const noisePool = this.generateSymbols('noise', totalNoise);
+
+            const calculatedMetrics = {
+                ccuTotal,
+                ccu1,
+                ccu2,
+                ccu3,
+                totalCapacity,
+                usedCapacity,
+                cc1Capacity,
+                cc2Capacity,
+                cc3Capacity,
+                ed: usedCapacity,
+                eb: totalBits,
+                en: totalNoise
+            };
+
+            // Log detailed initialization report
+            console.log('=== System Initialization Report ===');
+            console.log('Capacity Metrics:', {
+                totalCapacity: calculatedMetrics.totalCapacity.toFixed(2),
+                ccuTotal: calculatedMetrics.ccuTotal.toFixed(2) + '%',
+                usedCapacity: calculatedMetrics.usedCapacity.toFixed(2),
+                cc1: {
+                    capacity: calculatedMetrics.cc1Capacity.toFixed(2),
+                    utilization: calculatedMetrics.ccu1.toFixed(2) + '%'
+                },
+                cc2: {
+                    capacity: calculatedMetrics.cc2Capacity.toFixed(2),
+                    utilization: calculatedMetrics.ccu2.toFixed(2) + '%'
+                },
+                cc3: {
+                    capacity: calculatedMetrics.cc3Capacity.toFixed(2),
+                    utilization: calculatedMetrics.ccu3.toFixed(2) + '%'
+                }
+            });
+
+            console.log('Symbol Distribution:', {
+                bitsRatio: bitsRatio.toFixed(2) + '%',
+                totalBits,
+                totalNoise,
+                totalSymbols: totalBits + totalNoise
+            });
+
+            console.log('Generated Pools:', {
+                bitsPoolSize: bitsPool.length,
+                noisePoolSize: noisePool.length,
+                bitsSample: bitsPool.slice(0, 10).join(''),
+                noiseSample: noisePool.slice(0, 10).join('')
+            });
+
+            // Store the initialized data in IndexedDB
+            await this.environmentDB.storeEnvironmentalPool({
+                bits: bitsPool,
+                noise: noisePool,
+                metrics: calculatedMetrics
+            });
+
+            console.log('Environmental pool stored in database');
+
+            return {
+                bits: bitsPool,
+                noise: noisePool,
+                metrics: calculatedMetrics
+            };
+
+        } catch (error) {
+            console.error('Error in initializeSystemData:', error);
+            throw error;
         }
-
-        // Restore original state after duration
-        setTimeout(() => {
-            Object.assign(this, originalState);
-        }, duration);
-    }
-
-    introduceRandomDisturbance(intensity) {
-        const factor = intensity * 0.5;
-        this.capacityUtilization = Math.max(10, Math.min(100, this.capacityUtilization + (Math.random() - 0.5) * 20 * factor));
-        this.dataAvailability = Math.max(1, Math.min(10, this.dataAvailability + (Math.random() - 0.5) * 2 * factor));
-        this.totalDataBalance = Math.max(0, Math.min(1, this.totalDataBalance + (Math.random() - 0.5) * factor));
     }
 } 

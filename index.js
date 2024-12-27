@@ -4,6 +4,8 @@ import { TriangleSystem, RulesModule } from './ss1-state/rules-module.js';
 import { EnvironmentModule } from './ss3-io/environment-module.js';
 import { IntelligenceModule } from './intelligence/intelligence-module.js';
 import { PresetManager, ImportManager } from './shared/ui/ui-manager.js';
+import { CapacityModule } from './ss3-io/capacity-module.js';
+import { CircleMetrics } from './ss3-io/circle-metrics.js';
 
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,10 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const ctx = canvas.getContext('2d');
 
     // Initialize main system components in the correct order
-    const intelligenceModule = new IntelligenceModule(null); // Initialize with null, will be set later
     const triangleSystem = new TriangleSystem(canvas, ctx, null); // Initialize triangleSystem with null rulesModule for now
-    intelligenceModule.triangleSystem = triangleSystem; // Now set the triangleSystem
-    const environmentModule = new EnvironmentModule(intelligenceModule, triangleSystem); // Pass triangleSystem here
+    const intelligenceModule = new IntelligenceModule(triangleSystem);
+    const circleMetrics = new CircleMetrics(triangleSystem);
+    const capacityModule = new CapacityModule(circleMetrics);
+    const environmentModule = new EnvironmentModule(intelligenceModule, triangleSystem);
     const rulesModule = new RulesModule(triangleSystem, canvas, ctx, intelligenceModule, environmentModule);
     triangleSystem.rulesModule = rulesModule; // Now set the rulesModule in triangleSystem
 
@@ -62,5 +65,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Alternatively, listen for a custom event
     document.addEventListener('RulesModuleReady', () => {
         const presetManager = new PresetManager(triangleSystem);
+    });
+
+    // Add initialize button handler
+    document.getElementById('initializeSystem')?.addEventListener('click', async () => {
+        try {
+            console.log('Initialize button clicked');
+            const initialState = await capacityModule.initializeSystemData();
+            console.log('Capacity Module Initialization:', initialState);
+            
+            // Update environment module with the new state
+            await environmentModule.handleInitialization(initialState);
+        } catch (error) {
+            console.error('Error during initialization:', error);
+        }
     });
 });
