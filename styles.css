@@ -150,8 +150,43 @@
 }
 
 .data-controls-section {
-    padding: 0.5rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    width: fit-content;
+    margin-left: auto;
+}
+
+.data-controls-section button {
+    width: 120px;
+    text-align: center;
+    background-color: #0d4429 !important; /* Dark green for OFF state */
+    border-color: #0d4429 !important;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease-in-out;
+}
+
+/* Active/ON state */
+.data-controls-section button.active,
+#letterFlowToggle.active,
+#intelligenceToggle.active {
+    background-color: #198754 !important; /* Brighter green for ON state */
+    border-color: #198754 !important;
+}
+
+/* Hover state */
+.data-controls-section button:hover {
+    background-color: #145c3a !important; /* Medium green for hover */
+    border-color: #145c3a !important;
+}
+
+/* Remove margin from last button */
+.data-controls-section button:last-child {
+    margin-bottom: 0;
 }
 
 /* Keep original button styling */
@@ -2024,122 +2059,92 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     color: #fff !important;
 }
 
-/* System Intelligence inputs in animation panel */
+/* System Intelligence Inputs styling */
 .system-intelligence-inputs {
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: flex-end !important;
-    width: 100% !important;
-    gap: 5px !important; /* Add vertical spacing between rows */
+    font-size: 0.85rem;  /* Smaller font size */
+    display: flex;
+    flex-direction: column;
+    gap: 2px;  /* Minimal gap between rows */
+    align-items: flex-end;  /* Right justify the content */
 }
 
 .system-intelligence-inputs .input-row {
-    display: flex !important;
-    justify-content: flex-end !important;
-    align-items: center !important; /* Vertically center labels and inputs */
-    width: 100% !important;
-    gap: 10px !important; /* Add horizontal spacing between label and input */
+    display: flex;
+    align-items: center;
+    gap: 4px;  /* Small gap between label and input */
+    width: fit-content;  /* Only as wide as needed */
 }
 
 .system-intelligence-inputs label {
-    min-width: 5.5ch;  /* Slightly wider to accommodate "Entropy:" */
-    color: #fff;  /* Brighter color to match other labels */
-    font-size: 0.8rem;
-    text-align: right;  /* Align labels to the right */
+    margin: 0;  /* Remove default margins */
+    white-space: nowrap;  /* Prevent label wrapping */
 }
 
 .system-intelligence-inputs input {
-    width: 8ch !important;
-    min-width: 8ch !important;
-    padding: 0.15rem 0.25rem !important;
-    font-size: 0.8rem !important;
-    text-align: center !important;
-    height: auto !important;
-    background-color: #1e1e1e !important;  /* Match the animation input background */
-    color: #fff !important;
-    border: 1px solid #3a3a3a !important;  /* Match the animation input border */
-    border-radius: 4px !important;
+    width: 50px;  /* Consistent width for number inputs */
+    height: 22px;  /* Smaller height */
+    padding: 2px 4px;  /* Minimal padding */
+    font-size: 0.85rem;  /* Match parent font size */
 }
 
-/* Add specific styling for the loss input field */
-#loss-input-factor {
-    width: 8ch !important;
-    min-width: 8ch !important;
-    padding: 0.15rem 0.25rem !important;
-    font-size: 0.8rem !important;
-    text-align: center !important;
-    height: auto !important;
-    background-color: #1e1e1e !important;
-    color: #fff !important;
-    border: 1px solid #3a3a3a !important;
-    border-radius: 4px !important;
+/* For readonly inputs (metrics) */
+.system-intelligence-inputs input[readonly] {
+    background-color: #2b2b2b;  /* Darker background for readonly fields */
+    border: 1px solid #444;
+    color: #fff;
 }
 
-#loss-input-factor:focus {
-    outline: none !important;
+/* For number inputs */
+.system-intelligence-inputs input[type="number"] {
+    background-color: #333;  /* Slightly lighter background for editable fields */
+    border: 1px solid #444;
+    color: #fff;
+}
+
+.intelligence-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    width: fit-content;
+    margin-left: auto;
+}
+
+.intelligence-controls button {
+    width: 120px;
+    text-align: center;
+    background-color: #0d4429 !important; /* Dark green for OFF state */
+    border-color: #0d4429 !important;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    border-radius: 0.25rem;
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease-in-out;
+}
+
+/* Active/ON state */
+.intelligence-controls button.active,
+#letterFlowToggle.active,
+#intelligenceToggle.active {
+    background-color: #198754 !important; /* Brighter green for ON state */
     border-color: #198754 !important;
-    box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25) !important;
-}
-
-/* Ensure input doesn't maintain focus styling after blur */
-#loss-input-factor:not(:focus) {
-    border-color: #3a3a3a !important;
-    box-shadow: none !important;
-}
-
-/* Intelligence button */
-
-
-
-/* Intelligence Toggle Button Styles - Base state */
-#intelligenceToggle {
-    width: 14ch !important;
-    text-align: center !important;
-    margin-bottom: 0.5rem !important;
-    padding: 0.375rem 0.75rem !important;
-    border-radius: 4px !important;
-    background-color: #198754 !important;
-    border-color: #198754 !important;
-    color: #fff !important;
-    transition: background-color 0.15s ease-in-out !important;
 }
 
 /* Hover state */
-#intelligenceToggle:hover {
-    background-color: #157347 !important;
-    border-color: #146c43 !important;
+.intelligence-controls button:hover {
+    background-color: #145c3a !important; /* Medium green for hover */
+    border-color: #145c3a !important;
 }
 
-/* Status Icons - More specific selectors with !important */
-#intelligenceToggle .status-icon-off {
-    display: inline;
-    color: #ff0000 !important;  /* Bright red */
+/* Add these new styles */
+@keyframes flash-success {
+    0% { background-color: #0d4429 !important; }
+    50% { background-color: #198754 !important; }
+    100% { background-color: #0d4429 !important; }
 }
 
-#intelligenceToggle .status-icon-on {
-    display: none;
-    color: #00ff00 !important;  /* Bright green */
-}
-
-/* Active state (on) */
-#intelligenceToggle.active .status-icon-off {
-    display: none;
-}
-
-#intelligenceToggle.active .status-icon-on {
-    display: inline;
-}
-
-.env-input {
-    width: 10ch !important;  /* Force width to be 10 characters */
-    min-width: 10ch !important;
-    max-width: 10ch !important;
-}
-
-.dashboard-panel .panel-content .panel-row .label-value-pair .env-input {
-    width: 10ch !important;
-    min-width: 10ch !important;
-    max-width: 10ch !important;
-    flex: none !important;  /* Prevent flex growth */
-    box-sizing: border-box !important;  /* Include padding in width calculation */
+/* Specific buttons that should flash */
+#initializeSystem.flash,
+#zeroDataButton.flash {
+    animation: flash-success 1s ease-in-out !important;
 }

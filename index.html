@@ -141,6 +141,105 @@
             <div class="d-flex align-items-start gap-2">
                 <!-- Left Animation Panel -->
                 <div class="animation-panel bg-dark p-2 rounded">
+                    <!-- System Controls Buttons -->
+                    <div class="intelligence-controls">
+                        <button id="initializeSystem" class="btn">Initialize</button>
+                        <button id="processDataButton" class="btn">Process</button>
+                        <button id="letterFlowToggle" class="btn">Data Flow</button>
+                        <button id="intelligenceToggle" class="btn">Animate</button>
+                        <button id="zeroDataButton" class="btn">Zero Data</button>
+                    </div>
+                    <!-- System Internal Data Controls -->
+                    <div class="system-intelligence-inputs mt-3">
+                        <!-- Add Randomize checkbox after Zero Data button -->
+                        <div class="input-row">
+                            <input type="checkbox" id="randomize-data" checked>
+                            <label for="randomize-data">Randomize</label>
+                        </div>
+
+                        <!-- Environmental Data Controls -->
+                        <div class="input-row">
+                            <label for="system-ed">ED</label>
+                            <input id="system-ed" type="text" readonly>
+                            <label for="ed-percent">%</label>
+                            <input type="number" id="ed-percent" min="0" max="100" value="50">
+                        </div>
+                        <div class="input-row">
+                            <label for="system-eb">EB</label>
+                            <input id="system-eb" type="text" readonly>
+                            <label for="eb-percent">%</label>
+                            <input type="number" id="eb-percent" min="0" max="100" value="50">
+                        </div>
+                        <div class="input-row">
+                            <label for="system-en">EN</label>
+                            <input id="system-en" type="text" readonly>
+                            <label for="en-percent">%</label>
+                            <input type="number" id="en-percent" min="0" max="100" value="50" readonly>
+                        </div>
+
+                        <!-- Processing Pool Metrics -->
+                        <div class="input-row">
+                            <label for="process-d">PD</label>
+                            <input id="process-d" type="text" readonly>
+                            <label for="flow-rate">R</label>
+                            <input type="number" id="flow-rate" min="0" max="1000" value="10">
+                        </div>
+                        <div class="input-row">
+                            <label for="process-b">PB</label>
+                            <input id="process-b" type="text" readonly>
+                            <label for="pb-flow-rate">%</label>
+                            <input type="number" id="pb-flow-rate" min="0" max="100" value="50">
+                        </div>
+                        <div class="input-row">
+                            <label for="process-n">PN</label>
+                            <input id="process-n" type="text" readonly>
+                            <label for="pn-flow-rate">%</label>
+                            <input type="number" id="pn-flow-rate" min="0" max="100" value="50" readonly>
+                        </div>
+
+                        <!-- Existing System Controls -->
+                        <div class="input-row">
+                            <label for="system-net-d">Net D</label>
+                            <input id="system-net-d" type="text" readonly>
+                        </div>
+                        <div class="input-row">
+                            <label for="system-converted">Conv D</label>
+                            <input id="system-converted" type="text" readonly>
+                        </div>
+                        <div class="input-row">
+                            <label for="loss-rate">D Loss %</label>
+                            <input type="number" id="loss-rate" min="0" max="100" value="0">
+                        </div>
+                        <div class="input-row">
+                            <label for="data-reduction">B Convert Rate</label>
+                            <input type="number" 
+                                   id="data-reduction" 
+                                   min="0" 
+                                   max="100" 
+                                   step="0.1">    
+                        </div>
+                        <div class="input-row">
+                            <label for="en-flow-rate">EN Flow</label>
+                            <input type="number" id="en-flow-rate" min="0" max="100" value="0">
+                        </div>
+                        <div class="input-row">
+                            <label for="bits-loss-rate">B Loss %</label>
+                            <input type="number" id="bits-loss-rate" min="0" max="100" value="0">
+                        </div>
+                        <div class="input-row">
+                            <label for="noise-gain-rate">N Gain %</label>
+                            <input type="number" id="noise-gain-rate" min="0" max="100" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canvas (Center) -->
+                <div id="canvas-container" class="bg-dark p-2 rounded">
+                    <canvas id="canvas"></canvas>
+                </div>
+
+                <!-- Right Controls Panel -->
+                <div class="controls-panel bg-dark p-2 rounded">
                     <div class="animation-inputs-grid">
                         <div class="grid-header">Start</div>
                         <div class="grid-header">End</div>
@@ -166,47 +265,6 @@
                             <label for="animation-loop" class="form-check-label">Loop</label>
                         </div>
                     </div>
-
-                    <!-- System Internal Data Controls -->
-                    <div class="system-intelligence-inputs mt-3">
-                        <div class="input-row">
-                            <label for="system-net-d">Net D</label>
-                            <input id="system-net-d" type="text" readonly>
-                        </div>
-                        <div class="input-row">
-                            <label for="system-converted">Conv D</label>
-                            <input id="system-converted" type="text" readonly>
-                        </div>
-                        <div class="input-row">
-                            <label for="flow-rate">D Flow</label>
-                            <input type="number" id="flow-rate" min="1" max="100" value="10">
-                        </div>
-                        <div class="input-row">
-                            <label for="loss-rate">D Loss %</label>
-                            <input type="number" id="loss-rate" min="0" max="100" value="0">
-                        </div>
-                        <div class="input-row">
-                            <label for="data-reduction">B Convert Rate</label>
-                            <input type="number" 
-                                   id="data-reduction" 
-                                   min="0" 
-                                   max="100" 
-                                   step="0.1">    
-                        </div>
-                        <div class="input-row">
-                            <label for="en-flow-rate">EN Flow</label>
-                            <input type="number" id="en-flow-rate" min="0" max="100" value="0">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Canvas (Center) -->
-                <div id="canvas-container" class="bg-dark p-2 rounded">
-                    <canvas id="canvas"></canvas>
-                </div>
-
-                <!-- Right Controls Panel -->
-                <div class="controls-panel bg-dark p-2 rounded">
                     <!-- Data Management Section -->
                     <div class="data-controls-section">
                         <button id="saveState" class="btn btn-primary btn-sm w-100 mb-2">Save State</button>
@@ -216,16 +274,7 @@
                         <input type="file" id="importFile" style="display: none;" accept=".csv">
                     </div>
                     
-                    <!-- System Controls Section -->
-                    <div class="data-controls-section">
-                        <button id="letterFlowToggle" class="btn btn-primary btn-sm w-100 mb-2">Start Flow</button>
-                        <button id="intelligenceToggle" class="btn btn-primary btn-sm w-100 mb-2">
-                            Intelligence
-                            <span class="status-icon-off">&times;</span>
-                            <span class="status-icon-on">&check;</span>
-                        </button>
-                        <button id="zeroDataButton" class="btn btn-primary btn-sm w-100">Zero Data</button>
-                    </div>
+                    
                 </div>
             </div>
 
@@ -309,21 +358,6 @@
                         </div>
                     </div>
                     
-                    <!-- System Environment Panel -->
-                    <div class="panel-row">
-                        <div class="label-value-pair">
-                            <label for="system-ed">ED</label>
-                            <input type="text" id="system-ed" class="env-input" readonly>
-                        </div>
-                        <div class="label-value-pair">
-                            <label for="system-eb">EB</label>
-                            <input type="text" id="system-eb" class="env-input" readonly>
-                        </div>
-                        <div class="label-value-pair">
-                            <label for="system-en">EN</label>
-                            <input type="text" id="system-en" class="env-input" readonly>
-                        </div>
-                    </div>
                     <!-- 9 Point Circle Row -->
                     <div class="panel-row">
                         <div class="label-value-pair">
@@ -597,10 +631,6 @@
                         <input id="subsystem-1-perimeter" type="text" readonly>
                     </div>
                     <div class="label-value-pair">
-                        <label>ssc1</label>
-                        <input id="subsystem-1-area" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
                         <label>ssh/ssc1</label>
                         <input id="subsystem-1-ratio" type="text" readonly>
                     </div>
@@ -629,10 +659,6 @@
                         <input id="subsystem-2-perimeter" type="text" readonly>
                     </div>
                     <div class="label-value-pair">
-                        <label>ssc2</label>
-                        <input id="subsystem-2-area" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
                         <label>ssh/ssc2</label>
                         <input id="subsystem-2-ratio" type="text" readonly>
                     </div>
@@ -659,10 +685,6 @@
                     <div class="label-value-pair">
                         <label>ssh3</label>
                         <input id="subsystem-3-perimeter" type="text" readonly>
-                    </div>
-                    <div class="label-value-pair">
-                        <label>ssc3</label>
-                        <input id="subsystem-3-area" type="text" readonly>
                     </div>
                     <div class="label-value-pair">
                         <label>ssh/ssc3</label>

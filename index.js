@@ -6,6 +6,7 @@ import { IntelligenceModule } from './intelligence/intelligence-module.js';
 import { PresetManager, ImportManager } from './shared/ui/ui-manager.js';
 import { CapacityModule } from './ss3-io/capacity-module.js';
 import { CircleMetrics } from './ss3-io/circle-metrics.js';
+import { DataProcessing } from './ss2-processing/data-processing.js';
 
 // Wait for DOM to be fully loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const rulesModule = new RulesModule(triangleSystem, canvas, ctx, intelligenceModule, environmentModule);
     triangleSystem.rulesModule = rulesModule; // Now set the rulesModule in triangleSystem
 
+    // Initialize DataProcessing
+    const dataProcessing = new DataProcessing(environmentModule);
+
     // Call updateDashboard after rulesModule is available
     triangleSystem.updateDashboard();
 
@@ -37,7 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
         triangleSystem,
         rulesModule,
         intelligenceModule,
-        environmentModule
+        environmentModule,
+        dataProcessing
     });
 
     // Initialize RulesModule with a Promise
@@ -70,12 +75,24 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add initialize button handler
     document.getElementById('initializeSystem')?.addEventListener('click', async () => {
         try {
-            console.log('Initialize button clicked');
-            const initialState = await capacityModule.initializeSystemData();
-            console.log('Capacity Module Initialization:', initialState);
+            console.log('Initialize button clicked (index.js)');
             
-            // Update environment module with the new state
+            // Initialize capacity module first
+            const initialState = await capacityModule.initializeSystemData();
+            console.log('Capacity Module initialized with state:', {
+                edPercent: initialState.metrics.edPercent,
+                ebPercent: initialState.metrics.ebPercent,
+                usedCapacity: initialState.metrics.usedCapacity,
+                bitsCount: initialState.metrics.bitsCount,
+                noiseCount: initialState.metrics.noiseCount
+            });
+            
+            // Then update environment module with the state
             await environmentModule.handleInitialization(initialState);
+            
+            // Final dashboard update from capacity module
+            capacityModule.updateDashboard(initialState.metrics);
+            
         } catch (error) {
             console.error('Error during initialization:', error);
         }

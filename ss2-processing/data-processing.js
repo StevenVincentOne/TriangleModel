@@ -1,3 +1,5 @@
+import { environmentDB } from '../shared/ui/database.js';
+
 export class LossFunction {
     constructor() {
         this.lossFactors = {
@@ -170,23 +172,30 @@ export class NodeChannelEntropy {
 
     // Removed processLetter as it's handled by IntelligenceModule
 }
+
 export class DataProcessing {
     constructor(environmentModule) {
+        console.log('DataProcessing constructor called');
         this.environmentModule = environmentModule;
-        this.lossFunction = new LossFunction();
-        this.nodeChannelEntropy = new NodeChannelEntropy();
+        this.environmentDB = environmentDB;
+        console.log('Using shared database instance in DataProcessing');
+        this.flowRate = 10;
+        this.pbPercent = 50;
         this.isProcessing = false;
         
-        // Add processing data pool
-        this.processingPool = {
-            totalData: 0,      // PD (Process Data)
-            processBits: 0,    // PB (Process Bits)
-            processNoise: 0,   // PN (Process Noise)
-            unprocessed: 0     // Data waiting to be processed
-        };
+        // Wait for database to be ready
+        this.ready = this.init();
+    }
 
-        // Initialize dashboard elements
-        this.initializeDashboardElements();
+    async init() {
+        try {
+            await this.environmentDB.ready;
+            console.log('Database ready for processing');
+            this.initializeDashboardElements();
+            this.setupControls();
+        } catch (error) {
+            console.error('Error initializing DataProcessing:', error);
+        }
     }
 
     initializeDashboardElements() {
@@ -195,55 +204,104 @@ export class DataProcessing {
             processBits: document.getElementById('process-b'),
             processNoise: document.getElementById('process-n')
         };
-        
-        console.log('Data Processing Dashboard Elements:', this.dashboardElements); // Debug log
     }
 
-    startDataFlow() {
-        if (this.isProcessing) return;
+    setupControls() {
+        console.log('Setting up controls');
         
+        // Process button handler
+        const processButton = document.getElementById('processDataButton');
+        console.log('Process button element:', processButton);
+        
+        processButton?.addEventListener('click', (e) => {
+            console.log('Process button clicked');
+            if (this.isProcessing) {
+                console.log('Stopping processing');
+                this.stopProcessing();
+                e.target.classList.remove('active');
+            } else {
+                console.log('Starting processing');
+                this.startProcessing();
+                e.target.classList.add('active');
+            }
+        });
+
+        // Flow rate control
+        document.getElementById('flow-rate')?.addEventListener('input', (e) => {
+            this.flowRate = parseInt(e.target.value) || 0;
+        });
+
+        // PB percentage control
+        document.getElementById('pb-flow-rate')?.addEventListener('input', (e) => {
+            this.pbPercent = parseInt(e.target.value) || 0;
+            const pnInput = document.getElementById('pn-flow-rate');
+            if (pnInput) {
+                pnInput.value = 100 - this.pbPercent;
+            }
+        });
+
+        // Data Flow button
+        document.getElementById('letterFlowToggle')?.addEventListener('click', (e) => {
+            if (this.isProcessing) {
+                this.stopDataFlow();
+                e.target.classList.remove('active');
+            } else {
+                this.startDataFlow();
+                e.target.classList.add('active');
+            }
+        });
+    }
+
+    async startDataFlow() {
+        if (this.isProcessing) return;
         this.isProcessing = true;
         
-        // Get environmental data
-        const envData = {
-            bits: this.environmentModule.environmentalData.environmentalBits,
-            noise: this.environmentModule.environmentalData.environmentalNoise
-        };
+        this.flowInterval = setInterval(async () => {
+            const envData = await this.environmentModule.environmentDB.getEnvironmentalPool();
+            if (!envData || (!envData.bits.length && !envData.noise.length)) {
+                console.log('No environmental data available');
+                return;
+            }
 
-        console.log('Processing environmental data:', envData);
+            // Calculate symbols to process based on flow rate
+            const symbolsToProcess = Math.min(this.flowRate, envData.bits.length + envData.noise.length);
+            
+            for (let i = 0; i < symbolsToProcess; i++) {
+                // Determine whether to process as bit or noise based on PB percentage
+                const processingAsBit = Math.random() * 100 < this.pbPercent;
+                let symbol;
 
-        // Process incoming environmental data
-        this.processEnvironmentalData(envData);
+                if (processingAsBit && envData.bits.length > 0) {
+                    symbol = envData.bits.shift();
+                    this.processingPool.processBits++;
+                } else if (!processingAsBit && envData.noise.length > 0) {
+                    symbol = envData.noise.shift();
+                    this.processingPool.processNoise++;
+                } else {
+                    continue; // Skip if desired type is empty
+                }
+
+                this.processingPool.totalData++;
+
+                // Store in processing pool database
+                await this.processingPoolDB.storeSymbol({
+                    symbol,
+                    timestamp: Date.now(),
+                    type: processingAsBit ? 'bit' : 'noise'
+                });
+            }
+
+            // Update environmental database
+            await this.environmentModule.environmentDB.storeEnvironmentalPool(envData);
+            
+            // Update displays
+            this.updateDashboard();
+        }, 1000); // Run every second
     }
 
-    processData(data) {
-        // Decrement from environmental pool
-        this.environmentModule.environmentalData.environmentalBits--;
-        
-        // Increment processing pool
-        this.processingPool.unprocessed++;
-        this.processingPool.totalData++;
-        
-        // Process through loss function
-        const processedData = this.lossFunction.processData(data);
-        
-        // Update processing pool based on loss function results
-        if (processedData) {
-            this.processingPool.processBits += processedData.processedBits;
-            this.processingPool.processNoise += processedData.processedNoise;
-            this.processingPool.unprocessed--;
-        }
-        
-        // Update dashboard
-        this.updateDashboard();
-        
-        // If intelligence module exists, add to data pool
-        if (this.environmentModule.intelligenceModule) {
-            this.environmentModule.intelligenceModule.addToDataPool(data.letter);
-        }
-
-        console.log('Processing pool state:', this.processingPool);
-        return processedData;
+    stopDataFlow() {
+        this.isProcessing = false;
+        clearInterval(this.flowInterval);
     }
 
     updateDashboard() {
@@ -258,19 +316,81 @@ export class DataProcessing {
         }
     }
 
-    processEnvironmentalData(envData) {
-        // Apply loss function to incoming data
-        const processedData = this.lossFunction.processData(envData);
+    async startProcessing() {
+        console.log('startProcessing called');
+        if (this.isProcessing) {
+            console.log('Already processing, returning');
+            return;
+        }
         
-        // Process through node channels
-        this.nodeChannelEntropy.processData(processedData);
+        this.isProcessing = true;
+        console.log('Setting up process interval');
+        
+        this.processInterval = setInterval(async () => {
+            try {
+                console.log('Process interval tick');
+                const envData = await this.environmentDB.getEnvironmentalPool();
+                console.log('Retrieved environmental data:', {
+                    bitsLength: envData?.bits?.length || 0,
+                    noiseLength: envData?.noise?.length || 0,
+                    sampleBits: envData?.bits?.slice(0, 5),
+                    sampleNoise: envData?.noise?.slice(0, 5)
+                });
 
-        console.log('Processed data:', processedData);
-        
-        return processedData;
+                if (!envData || (!envData.bits?.length && !envData.noise?.length)) {
+                    console.log('No environmental data available');
+                    return;
+                }
+
+                // Process symbols based on flow rate
+                const symbolsToProcess = Math.min(this.flowRate, envData.bits.length + envData.noise.length);
+                
+                for (let i = 0; i < symbolsToProcess; i++) {
+                    const processingAsBit = Math.random() * 100 < this.pbPercent;
+                    let symbol;
+
+                    if (processingAsBit && envData.bits.length > 0) {
+                        symbol = envData.bits.shift();
+                        this.processingPool.processBits++;
+                    } else if (!processingAsBit && envData.noise.length > 0) {
+                        symbol = envData.noise.shift();
+                        this.processingPool.processNoise++;
+                    } else {
+                        continue;
+                    }
+
+                    this.processingPool.totalData++;
+
+                    // Store the processed symbol
+                    await this.environmentDB.storeProcessedSymbol({
+                        symbol,
+                        type: processingAsBit ? 'bit' : 'noise'
+                    });
+                }
+
+                // Update environmental pool
+                await this.environmentDB.storeEnvironmentalPool(envData);
+                
+                // Update displays
+                this.updateDashboard();
+
+                console.log('Processing Pool State:', {
+                    total: this.processingPool.totalData,
+                    bits: this.processingPool.processBits,
+                    noise: this.processingPool.processNoise,
+                    remainingEnv: {
+                        bits: envData.bits.length,
+                        noise: envData.noise.length
+                    }
+                });
+            } catch (error) {
+                console.error('Error in processing:', error);
+            }
+        }, 1000);
     }
 
-    stopDataFlow() {
+    stopProcessing() {
         this.isProcessing = false;
+        clearInterval(this.processInterval);
     }
 }
