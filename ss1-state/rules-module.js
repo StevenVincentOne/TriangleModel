@@ -1,6 +1,7 @@
-import { TriangleDatabase } from '../shared/ui/database.js';
 import { PresetManager, ImportManager } from '../shared/ui/ui-manager.js';
-import { CircleMetrics } from '../ss3-io/circle-metrics.js';  // Updated import path
+import { CircleMetrics } from '../ss3-io/circle-metrics.js';
+import { environmentDB } from '../shared/ui/database.js';
+import { CapacityModule } from '../ss3-io/capacity-module.js';
 
 export class RulesModule {
     constructor(system, canvas, ctx, intelligenceModule, environmentModule) {
@@ -13,12 +14,12 @@ export class RulesModule {
 
         // Simulate asynchronous initialization if necessary
         setTimeout(() => {
-            // Initialization logic here
             console.log('RulesModule initialized');
-
-            // Dispatch event to signal readiness
             document.dispatchEvent(new Event('RulesModuleReady'));
-        }, 0); // Adjust timing as necessary
+        }, 0);
+
+        // Use the shared instance
+        this.database = environmentDB;
     }
 }
 
@@ -35,6 +36,9 @@ export class TriangleSystem {
         // Transform to center origin and flip y-axis correctly
         this.ctx.translate(this.canvas.width/2, this.canvas.height/2);
         this.ctx.scale(1, -1);  // This flips the y-axis
+        
+        // Initialize CircleMetrics first
+        this.circleMetrics = new CircleMetrics(this);
         
         this.system = {};
         this.showConnections = true;
@@ -66,7 +70,7 @@ export class TriangleSystem {
         this.initializeEventListeners();
         this.initializeManualControls();
         
-        // Draw initial state
+        // Now safe to call updateDashboard
         this.drawSystem();
         this.updateDashboard();
         
@@ -107,9 +111,6 @@ export class TriangleSystem {
 
         // Initialize subsystem metrics
         this.subsystemAreas = [0, 0, 0];  // Initialize array for three subsystems
-
-        // Initialize database
-        this.db = new TriangleDatabase();
         
                 // Add Save State button listener
         const saveStateButton = document.getElementById('saveState');
@@ -175,6 +176,9 @@ export class TriangleSystem {
         // Add animation-related properties
         this.animationLoop = null;
         this.animationFrame = null;
+
+        // Initialize CapacityModule with CircleMetrics
+        this.capacityModule = new CapacityModule(this.circleMetrics);
     }  // End of constructor
 
     loadPreset(name, values) {
@@ -822,6 +826,16 @@ export class TriangleSystem {
     }
 
     updateDashboard() {
+        // Check if circleMetrics exists before using it
+        if (this.circleMetrics) {
+            const metrics = this.circleMetrics.calculateExternalRegions();
+            
+            // Then notify capacity module if it exists
+            if (metrics && this.capacityModule) {
+                this.capacityModule.updateUtilizationPercentages(metrics);
+            }
+        }
+        
         if (!this.rulesModule) {
             console.log('RulesModule not yet available, skipping dashboard update.');
             return;
@@ -1580,6 +1594,9 @@ export class TriangleSystem {
                     areaRatio: document.querySelector('#nine-point-ratio') ? 'yes' : 'no'
                 });
             }
+
+            // Notify metrics update
+            this.notifyMetricsUpdate();
 
         } catch (error) {
             console.error('Error updating dashboard:', error);
@@ -2532,6 +2549,9 @@ export class TriangleSystem {
         this.updateDerivedPoints();
         this.updateDashboard();
         this.drawSystem();
+
+        // Notify metrics update
+        this.notifyMetricsUpdate();
     }
 
     // Add new method for drawing just the incenter point
@@ -4924,6 +4944,27 @@ export class TriangleSystem {
             cancelAnimationFrame(this.animationFrame);
             this.animationFrame = null;
         }
+    }
+
+    // Add this method to notify of triangle updates
+    notifyMetricsUpdate() {
+        console.log('Triangle notifying of metrics update');
+        const metrics = this.circleMetrics.calculateExternalRegions();
+        if (metrics && this.capacityModule) {
+            this.capacityModule.updateUtilizationPercentages(metrics);
+        }
+    }
+
+    // Add this to any method that updates triangle positions
+    updateTriangleState() {
+        // ... existing update code ...
+        this.notifyMetricsUpdate();
+    }
+
+    // Also add to drag handling
+    handleDrag(event) {
+        // ... existing drag code ...
+        this.notifyMetricsUpdate();
     }
 }
 

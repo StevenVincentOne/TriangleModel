@@ -12,6 +12,9 @@ export class EnvironmentModule {
         this.flowRate = 10;
         this.enFlowRate = 0;
         this.enGenerationInterval = null;
+        this.environmentalData = new EnvironmentalData();
+        this.capacityModule = null;
+        this.addFlowRateEventListeners();
         
         // Updated alphabet: 26 letters plus 4 special characters (30 total characters)
         this.alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ/+&∅';
@@ -36,14 +39,9 @@ export class EnvironmentModule {
         // Initialize environmental data right after setup
         this.initializeEnvironmentalData(true);
         
-        // Add debug logging
-        console.log('Environment Module initialized with:', {
-            cc: this.getCC(),
-            ed: this.environmentalData.environmentalData,
-            ccu: this.calculateCCU()
-        });
-
-        // Add zero data button handler
+        // Remove the initialize button handler from here since it's handled in index.js
+        
+        // Keep the zero data button handler
         const zeroDataButton = document.getElementById('zeroDataButton');
         if (zeroDataButton) {
             zeroDataButton.addEventListener('click', () => {
@@ -56,7 +54,12 @@ export class EnvironmentModule {
             });
         }
 
-        this.circleMetrics = new CircleMetrics(triangleSystem);
+        // Add debug logging
+        console.log('Environment Module initialized with:', {
+            cc: this.getCC(),
+            ed: this.environmentalData.environmentalData,
+            ccu: this.calculateCCU()
+        });
 
         // Add EN flow rate handler
         const enRateInput = document.getElementById('en-flow-rate');
@@ -89,14 +92,7 @@ export class EnvironmentModule {
             };
         }
 
-        // Add initialize button handler
-        const initButton = document.getElementById('initializeSystem');
-        if (initButton) {
-            initButton.addEventListener('click', () => {
-                console.log('Initialize button clicked');
-                this.initializeEnvironmentalData(false);
-            });
-        }
+        this.circleMetrics = new CircleMetrics(triangleSystem);
     }
 
     initializeControls() {
@@ -343,40 +339,18 @@ export class EnvironmentModule {
     updateDashboard() {
         const metrics = this.triangleSystem.circleMetrics.calculateExternalRegions();
         if (metrics) {
-            // Update CC and CCU
-            const cc = metrics.totalExternal;
-            const ccu = this.calculateCCU();
-
+            // Update CC areas only
             if (this.dashboardElements.circumcircleArea) {
-                this.dashboardElements.circumcircleArea.value = cc.toFixed(2);
+                this.dashboardElements.circumcircleArea.value = metrics.totalExternal.toFixed(2);
             }
-            if (this.dashboardElements.circumcircleUtilization) {
-                this.dashboardElements.circumcircleUtilization.value = `${ccu.toFixed(1)}%`;
-            }
-
-            // Update CC1-3 areas and utilizations
             if (this.dashboardElements.cc1Area) {
                 this.dashboardElements.cc1Area.value = metrics.cc1.toFixed(2);
             }
-            if (this.dashboardElements.cc1Utilization) {
-                const cc1u = (this.environmentalData.cc1Data / metrics.cc1) * 100;
-                this.dashboardElements.cc1Utilization.value = `${cc1u.toFixed(1)}%`;
-            }
-
             if (this.dashboardElements.cc2Area) {
                 this.dashboardElements.cc2Area.value = metrics.cc2.toFixed(2);
             }
-            if (this.dashboardElements.cc2Utilization) {
-                const cc2u = (this.environmentalData.cc2Data / metrics.cc2) * 100;
-                this.dashboardElements.cc2Utilization.value = `${cc2u.toFixed(1)}%`;
-            }
-
             if (this.dashboardElements.cc3Area) {
                 this.dashboardElements.cc3Area.value = metrics.cc3.toFixed(2);
-            }
-            if (this.dashboardElements.cc3Utilization) {
-                const cc3u = (this.environmentalData.cc3Data / metrics.cc3) * 100;
-                this.dashboardElements.cc3Utilization.value = `${cc3u.toFixed(1)}%`;
             }
 
             // Update Environmental Data values
@@ -391,6 +365,11 @@ export class EnvironmentModule {
             if (this.dashboardElements.environmentalNoise) {
                 this.dashboardElements.environmentalNoise.value = 
                     this.environmentalData.environmentalNoise.toFixed(2);
+            }
+
+            // Notify CapacityModule of metrics change
+            if (this.triangleSystem.capacityModule) {
+                this.triangleSystem.capacityModule.updateUtilizationPercentages(metrics);
             }
         }
     }
@@ -417,6 +396,7 @@ export class EnvironmentModule {
 
             console.log('Updating circle capacities with metrics:', metrics);
             
+            // Update area displays
             if (this.dashboardElements.circumcircleArea) {
                 this.dashboardElements.circumcircleArea.value = metrics.totalExternal?.toFixed(2) || '0.00';
             }
@@ -430,6 +410,12 @@ export class EnvironmentModule {
                 this.dashboardElements.cc3Area.value = metrics.cc3?.toFixed(2) || '0.00';
             }
 
+            // Notify CapacityModule of the update
+            if (this.triangleSystem?.capacityModule) {
+                console.log('Notifying CapacityModule of metrics update');
+                this.triangleSystem.capacityModule.updateUtilizationPercentages(metrics);
+            }
+
         } catch (error) {
             console.error('Error in updateCircleCapacities:', error);
         }
@@ -441,32 +427,83 @@ export class EnvironmentModule {
             return;
         }
 
-        console.log('Handling initialization with state:', initialState);
+        console.log('EnvironmentModule handling initialization with state:', {
+            edPercent: initialState.metrics.edPercent,
+            ebPercent: initialState.metrics.ebPercent,
+            totalCapacity: initialState.metrics.totalCapacity,
+            usedCapacity: initialState.metrics.usedCapacity,
+            bitsCount: initialState.metrics.bitsCount,
+            noiseCount: initialState.metrics.noiseCount,
+            cc1: initialState.metrics.cc1,
+            cc2: initialState.metrics.cc2,
+            cc3: initialState.metrics.cc3
+        });
 
         // Update environmental data with the provided state
         this.environmentalData.setDirectly(
-            initialState.metrics.eb || 0,
-            initialState.metrics.en || 0
+            initialState.metrics.bitsCount || 0,
+            initialState.metrics.noiseCount || 0
         );
-        
-        this.environmentalData.cc1Data = initialState.metrics.cc1Capacity || 0;
-        this.environmentalData.cc2Data = initialState.metrics.cc2Capacity || 0;
-        this.environmentalData.cc3Data = initialState.metrics.cc3Capacity || 0;
-        
-        // Update dashboard
-        this.updateDashboard();
-        
-        console.log('Environment Module Updated:', {
-            environmentalData: this.environmentalData.environmentalData.toFixed(2),
-            bits: this.environmentalData.environmentalBits.toFixed(2),
-            noise: this.environmentalData.environmentalNoise.toFixed(2),
-            symbolPools: {
-                bitsCount: initialState.bits.length,
-                noiseCount: initialState.noise.length,
-                bitsSample: initialState.bits.slice(0, 10),
-                noiseSample: initialState.noise.slice(0, 10)
-            }
+
+        // Update CC data
+        this.environmentalData.cc1Data = initialState.metrics.cc1 || 0;
+        this.environmentalData.cc2Data = initialState.metrics.cc2 || 0;
+        this.environmentalData.cc3Data = initialState.metrics.cc3 || 0;
+
+        // Let CapacityModule handle the dashboard update
+        // Remove this.updateDashboard() call to prevent competing updates
+
+        console.log('EnvironmentModule initialization complete with values:', {
+            environmentalData: this.environmentalData.environmentalData,
+            bits: this.environmentalData.environmentalBits,
+            noise: this.environmentalData.environmentalNoise,
+            cc1: this.environmentalData.cc1Data,
+            cc2: this.environmentalData.cc2Data,
+            cc3: this.environmentalData.cc3Data
         });
+    }
+
+    addFlowRateEventListeners() {
+        // Handle flow rate input
+        const rateInput = document.getElementById('flow-rate');
+        if (rateInput) {
+            rateInput.value = this.flowRate;
+            
+            // Handle both input and keypress events
+            rateInput.addEventListener('input', (e) => {
+                const newRate = Math.min(1000, Math.max(0, parseInt(e.target.value) || 0));
+                this.updateFlowRate(newRate);
+            });
+
+            rateInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const newRate = Math.min(1000, Math.max(0, parseInt(e.target.value) || 0));
+                    this.updateFlowRate(newRate);
+                    rateInput.blur();
+                }
+            });
+        }
+
+        // Handle EN flow rate input
+        const enRateInput = document.getElementById('en-flow-rate');
+        if (enRateInput) {
+            enRateInput.value = this.enFlowRate;
+            
+            enRateInput.addEventListener('input', (e) => {
+                const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                this.updateENFlowRate(newRate);
+            });
+
+            enRateInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const newRate = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
+                    this.updateENFlowRate(newRate);
+                    enRateInput.blur();
+                }
+            });
+        }
     }
 }
 
@@ -520,3 +557,14 @@ class EnvironmentalData {
         this._environmentalData = this._environmentalBits + this._environmentalNoise;
     }
 }
+
+document.getElementById('zeroDataButton')?.addEventListener('click', () => {
+    const button = document.getElementById('zeroDataButton');
+    if (button) {
+        button.classList.add('flash');
+        setTimeout(() => {
+            button.classList.remove('flash');
+        }, 1000);
+    }
+    // ... rest of zero data functionality
+});
