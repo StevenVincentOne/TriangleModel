@@ -274,4 +274,38 @@ export class IntelligenceModule {
             this.updateDashboard();
         }
     }
+
+    // New method to fetch processing pool symbols
+    async getProcessingPoolSymbols() {
+        try {
+            console.log('Fetching symbols from Processing Pool store...');
+            const processedSymbols = await this.environmentDB.getProcessedSymbols();
+            console.log('Retrieved Processing Pool symbols:', processedSymbols);
+            return processedSymbols;
+        } catch (error) {
+            console.error('Error fetching Processing Pool symbols:', error);
+            return null;
+        }
+    }
+
+    // New method for Stage 2 of Process step
+    async processPoolSymbols() {
+        const poolSymbols = await this.getProcessingPoolSymbols();
+        if (!poolSymbols) return;
+
+        console.log('Starting Stage 2 processing of Pool symbols:', poolSymbols);
+
+        // Process each symbol through the existing letter processing logic
+        for (const symbol of poolSymbols) {
+            this.processLetter(symbol); // Uses existing symbol processing logic
+        }
+
+        console.log('Stage 2 processing complete:', {
+            totalLetters: this.entropyState.totalLetters,
+            netLetters: this.entropyState.netLetters,
+            totalWords: this.entropyState.totalWords,
+            totalEntropy: this.entropyState.totalEntropy,
+            convertedData: this.entropyState.convertedData
+        });
+    }
 } 

@@ -1,33 +1,447 @@
-import { PresetManager, ImportManager } from '../shared/ui/ui-manager.js';
-import { CircleMetrics } from '../ss3-io/circle-metrics.js';
-import { environmentDB } from '../shared/ui/database.js';
-import { CapacityModule } from '../ss3-io/capacity-module.js';
-
-export class RulesModule {
-    constructor(system, canvas, ctx, intelligenceModule, environmentModule) {
-        this.system = system || this.initializeEmptySystem();
-        this.canvas = canvas;
-        this.ctx = ctx;
-        this.intelligenceModule = intelligenceModule;
-        this.environmentModule = environmentModule;
-        this.capacityModule = this.environmentModule.capacityModule;
-
-        // Simulate asynchronous initialization if necessary
-        setTimeout(() => {
-            console.log('RulesModule initialized');
-            document.dispatchEvent(new Event('RulesModuleReady'));
-        }, 0);
-
-        // Use the shared instance
-        this.database = environmentDB;
+// Add this before the TriangleSystem class definition
+class TriangleDatabase {
+    constructor() {
+        this.initialized = false;
+        this.tokenClient = null;
+        this.accessToken = null;
+        
+        // Keep your existing configuration constants
+        this.API_KEY = 'AIzaSyCQh02aAcYmvvGJVVJFwRFOQ5Ptvug8dOQ';
+        this.CLIENT_ID = '66954381705-rib6tkc4qse6rdue4id2e1svmb6otm24.apps.googleusercontent.com';
+        this.SPREADSHEET_ID = '1LN0wA4gUY0XFdY_v8SlHvwMeu1A4_X8t56FF2mP1l40';
+        this.SCOPES = 'https://www.googleapis.com/auth/spreadsheets';
+        this.DISCOVERY_DOC = 'https://sheets.googleapis.com/$discovery/rest?version=v4';
     }
+
+    async init() {
+        try {
+            // Wait for both Google API libraries to load
+            await new Promise((resolve, reject) => {
+                const checkGAPILoaded = () => {
+                    if (window.gapi && window.google) {
+                        resolve();
+                    } else {
+                        setTimeout(checkGAPILoaded, 100);
+                    }
+                };
+                checkGAPILoaded();
+            });
+
+            // Initialize the tokenClient
+            this.tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: this.CLIENT_ID,
+                scope: this.SCOPES,
+                callback: '', // We'll handle this in getAccessToken
+            });
+
+            // Initialize gapi client
+            await new Promise((resolve, reject) => {
+                gapi.load('client', async () => {
+                    try {
+                        await gapi.client.init({
+                            apiKey: this.API_KEY,
+                            discoveryDocs: [this.DISCOVERY_DOC],
+                        });
+                        this.initialized = true;
+                        resolve();
+                    } catch (error) {
+                        console.error('Error initializing Google Sheets API:', error);
+                        reject(error);
+                    }
+                });
+            });
+        } catch (error) {
+            console.error('Failed to initialize Google Sheets:', error);
+            throw error;
+        }
+    }
+
+    async getAccessToken() {
+        return new Promise((resolve, reject) => {
+            try {
+                this.tokenClient.callback = (response) => {
+                    if (response.error !== undefined) {
+                        reject(response);
+                    }
+                    this.accessToken = response.access_token;
+                    resolve(response.access_token);
+                };
+                
+                if (this.accessToken === null) {
+                    // Request a new token
+                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+                } else {
+                    // Use existing token
+                    resolve(this.accessToken);
+                }
+            } catch (error) {
+                console.error('Error getting access token:', error);
+                reject(error);
+            }
+        });
+    }
+
+    /**
+     * Saves the provided values to Google Sheets.
+     * @param {Object} values - The data to append to the spreadsheet.
+     */
+    async saveToGoogleSheets(values) {
+        try {
+            console.log('Starting saveToGoogleSheets with values:', values);
+
+            // Get current headers
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: this.SPREADSHEET_ID,
+                range: 'Sheet1!A1:ZZ1'
+            });
+
+            let currentHeaders = response.result.values?.[0] || [];
+            console.log('Current headers:', currentHeaders);
+
+            // Get all keys from the values object
+            const allKeys = Object.keys(values);
+            
+            // Ensure State and Notes are first, ID is last
+            const orderedKeys = ['State', 'Notes'];
+            allKeys.forEach(key => {
+                if (key !== 'State' && key !== 'Notes' && key !== 'ID') {
+                    orderedKeys.push(key);
+                }
+            });
+            orderedKeys.push('ID');
+
+            // Update headers if needed
+            if (JSON.stringify(currentHeaders) !== JSON.stringify(orderedKeys)) {
+                console.log('Updating headers...');
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: this.SPREADSHEET_ID,
+                    range: `Sheet1!A1:${this.numberToColumn(orderedKeys.length)}1`,
+                    valueInputOption: 'RAW',
+                    resource: {
+                        values: [orderedKeys]
+                    }
+                });
+                currentHeaders = orderedKeys;
+            }
+
+            // Create row data using ordered headers
+            const rowData = orderedKeys.map(header => {
+                const value = values[header];
+                return value === Infinity ? '∞' : (value ?? '');
+            });
+
+            // Append the row
+            const appendResponse = await gapi.client.sheets.spreadsheets.values.append({
+                spreadsheetId: this.SPREADSHEET_ID,
+                range: `Sheet1!A1:${this.numberToColumn(orderedKeys.length)}`,
+                valueInputOption: 'USER_ENTERED',
+                resource: {
+                    values: [rowData]
+                }
+            });
+
+            console.log('Save successful:', appendResponse);
+            return true;
+
+        } catch (error) {
+            console.error('Error in saveToGoogleSheets:', {
+                message: error.message,
+                response: error.result,
+                status: error.status,
+                error
+            });
+            throw error;
+        }
+    }
+
+    async addNewColumns(existingHeaders, newColumns) {
+        try {
+            const startCol = this.numberToColumn(existingHeaders.length + 1);
+            const endCol = this.numberToColumn(existingHeaders.length + newColumns.length);
+
+            const response = await gapi.client.sheets.spreadsheets.values.update({
+                spreadsheetId: this.SPREADSHEET_ID,
+                range: `Sheet1!${startCol}1:${endCol}1`,
+                valueInputOption: 'RAW',
+                resource: {
+                    values: [newColumns]
+                }
+            });
+
+            if (response.status !== 200) {
+                throw new Error(`Failed to update columns: ${response.statusText}`);
+            }
+
+        } catch (error) {
+            console.error('Error adding new columns:', {
+                message: error.message,
+                response: error.result,
+                status: error.status,
+                error
+            });
+            throw error;
+        }
+    }
+
+    numberToColumn(num) {
+        let column = '';
+        while (num > 0) {
+            const modulo = (num - 1) % 26;
+            column = String.fromCharCode(65 + modulo) + column;
+            num = Math.floor((num - modulo) / 26);
+        }
+        return column;
+    }
+
+    async saveState() {
+        try {
+            // Prompt user for State name and Notes
+            const { stateName, notes, cancelled } = await this.promptStateDetails();
+            if (cancelled) {
+                return false;  // Exit early without showing success message
+            }
+
+            // Get next available ID
+            const nextId = await this.getNextStateId();
+            
+            console.log('Starting data collection...');
+            const collectedData = {
+                // Add State and Notes first
+                'State': stateName,
+                'Notes': notes || '',
+                
+                // System - Nodes
+                'N1 Angle': document.getElementById('node-n1-angle')?.value || '',
+                'N2 Angle': document.getElementById('node-n2-angle')?.value || '',
+                'N3 Angle': document.getElementById('node-n3-angle')?.value || '',
+                'N1 (xy)': document.getElementById('node1-coords')?.value || '',
+                'N2 (xy)': document.getElementById('node2-coords')?.value || '',
+                'N3 (xy)': document.getElementById('node3-coords')?.value || '',
+
+                // Node Channels
+                'NC1': document.getElementById('channel-1')?.value || '',
+                'NC2': document.getElementById('channel-2')?.value || '',
+                'NC3': document.getElementById('channel-3')?.value || '',
+
+                // I-Channels
+                'IC1': document.getElementById('ic-1')?.value || '',
+                'IC2': document.getElementById('ic-2')?.value || '',
+                'IC3': document.getElementById('ic-3')?.value || '',
+
+                // Medians
+                'M1 (xy)': document.getElementById('mid1-coords')?.value || '',
+                'M2 (xy)': document.getElementById('mid2-coords')?.value || '',
+                'M3 (xy)': document.getElementById('mid3-coords')?.value || '',
+                'ml1': document.getElementById('median1-length')?.value || '',
+                'ml2': document.getElementById('median2-length')?.value || '',
+                'ml3': document.getElementById('median3-length')?.value || '',
+
+                // Altitudes
+                'Af1 (xy)': document.getElementById('altitude1-coords')?.value || '',
+                'Af2 (xy)': document.getElementById('altitude2-coords')?.value || '',
+                'Af3 (xy)': document.getElementById('altitude3-coords')?.value || '',
+                'Al1': document.getElementById('altitude1-length')?.value || '',
+                'Al2': document.getElementById('altitude2-length')?.value || '',
+                'Al3': document.getElementById('altitude3-length')?.value || '',
+
+                // System Entropy and Capacity
+                'H': document.getElementById('system-h')?.value || '',
+                'C': document.getElementById('system-c')?.value || '',
+                'HP': document.getElementById('system-sph')?.value || '',
+                'HIC': document.getElementById('system-mch')?.value || '',
+                'HP/HIC': document.getElementById('hp-hic-ratio')?.value || '',
+                'HIC/HP': document.getElementById('hic-hp-ratio')?.value || '',
+                'HP/H': document.getElementById('hp-h-ratio')?.value || '',
+                'H/HP': document.getElementById('h-hp-ratio')?.value || '',
+                'HIC/H': document.getElementById('hic-h-ratio')?.value || '',
+                'H/HIC': document.getElementById('h-hic-ratio')?.value || '',
+
+                // Subsystems
+                'ss∠1': document.getElementById('subsystem-1-angle')?.value || '',
+                'ssh1': document.getElementById('subsystem-1-perimeter')?.value || '',
+                'ssc1': document.getElementById('subsystem-1-area')?.value || '',
+                'ssh/ssc1': document.getElementById('subsystem-1-ratio')?.value || '',
+                'ssc/ssh1': document.getElementById('subsystem-1-inverse-ratio')?.value || '',
+                'ssh/H1': document.getElementById('subsystem-1-system-ratio')?.value || '',
+                'H/ssh1': document.getElementById('subsystem-1-entropy-ratio')?.value || '',
+
+                'ss∠2': document.getElementById('subsystem-2-angle')?.value || '',
+                'ssh2': document.getElementById('subsystem-2-perimeter')?.value || '',
+                'ssc2': document.getElementById('subsystem-2-area')?.value || '',
+                'ssh/ssc2': document.getElementById('subsystem-2-ratio')?.value || '',
+                'ssc/ssh2': document.getElementById('subsystem-2-inverse-ratio')?.value || '',
+                'ssh/H2': document.getElementById('subsystem-2-system-ratio')?.value || '',
+                'H/ssh2': document.getElementById('subsystem-2-entropy-ratio')?.value || '',
+
+                'ss∠3': document.getElementById('subsystem-3-angle')?.value || '',
+                'ssh3': document.getElementById('subsystem-3-perimeter')?.value || '',
+                'ssc3': document.getElementById('subsystem-3-area')?.value || '',
+                'ssh/ssc3': document.getElementById('subsystem-3-ratio')?.value || '',
+                'ssc/ssh3': document.getElementById('subsystem-3-inverse-ratio')?.value || '',
+                'ssh/H3': document.getElementById('subsystem-3-system-ratio')?.value || '',
+                'H/ssh3': document.getElementById('subsystem-3-entropy-ratio')?.value || '',
+
+                // Euler Line
+                'O (xy)': document.getElementById('circumcenter-coords')?.value || '',
+                'I (xy)': document.getElementById('centroid-coords')?.value || '',
+                'SP (xy)': document.getElementById('subcenter-coords')?.value || '',
+                'NP (xy)': document.getElementById('nine-point-coords')?.value || '',
+                'HO (xy)': document.getElementById('orthocenter-coords')?.value || '',
+                'EL': document.getElementById('euler-line-length')?.value || '',
+                'mEL': document.getElementById('euler-line-slope')?.value || '',
+                'θEL': document.getElementById('euler-line-angle')?.value || '',
+                'O-I/EL': document.getElementById('o-i-ratio')?.value || '',
+                'I-SP/EL': document.getElementById('i-sp-ratio')?.value || '',
+                'SP-NP/EL': document.getElementById('sp-np-ratio')?.value || '',
+                'NP-HO/EL': document.getElementById('np-ho-ratio')?.value || '',
+                'NC1 θa': document.getElementById('nc1-acute')?.value || '',
+                'NC1 θo': document.getElementById('nc1-obtuse')?.value || '',
+                'NC2 θa': document.getElementById('nc2-acute')?.value || '',
+                'NC2 θo': document.getElementById('nc2-obtuse')?.value || '',
+                'NC3 θa': document.getElementById('nc3-acute')?.value || '',
+                'NC3 θo': document.getElementById('nc3-obtuse')?.value || '',
+
+                // Incircle Panel
+                'IN (xy)': document.getElementById('incenter-coords')?.value || '',
+                'T1 (xy)': document.getElementById('tan1-coords')?.value || '',
+                'T2 (xy)': document.getElementById('tan2-coords')?.value || '',
+                'T3 (xy)': document.getElementById('tan3-coords')?.value || '',
+                'd(I,IN)': document.getElementById('d-i-in')?.value || '',
+                'd(IN,ssi1)': document.getElementById('d-in-ssi1')?.value || '',
+                'd(IN,ssi2)': document.getElementById('d-in-ssi2')?.value || '',
+                'd(IN,ssi3)': document.getElementById('d-in-ssi3')?.value || '',
+                'rIN': document.getElementById('inradius')?.value || '',
+                'CIN': document.getElementById('incircle-capacity')?.value || '',
+                'HIN': document.getElementById('incircle-entropy')?.value || '',
+                'CIN/HIN': document.getElementById('cin-hin-ratio')?.value || '',
+                'HIN/CIN': document.getElementById('hin-cin-ratio')?.value || '',
+                'CIN/C': document.getElementById('cin-c-ratio')?.value || '',
+                'HIN/H': document.getElementById('hin-h-ratio')?.value || '',
+                'd(M,T)1': document.getElementById('d-m-t-n1')?.value || '',
+                'd(M,T)2': document.getElementById('d-m-t-n2')?.value || '',
+                'd(M,T)3': document.getElementById('d-m-t-n3')?.value || '',
+                'r(M,T)1': document.getElementById('r-m-t-n1')?.value || '',
+                'r(M,T)2': document.getElementById('r-m-t-n2')?.value || '',
+                'r(M,T)3': document.getElementById('r-m-t-n3')?.value || '',
+                'rNC(M,T)1': document.getElementById('r-m-t-nc1')?.value || '',
+                'rNC(M,T)2': document.getElementById('r-m-t-nc2')?.value || '',
+                'rNC(M,T)3': document.getElementById('r-m-t-nc3')?.value || '',
+
+                // ID must be last
+                'ID': nextId
+            };
+
+            console.log('Final collected data:', collectedData);
+            
+            // Save to Google Sheets
+            await this.saveToGoogleSheets(collectedData);
+            return true;  // Only return true if save was successful
+
+        } catch (error) {
+            console.error('Error in saveState:', {
+                message: error.message,
+                stack: error.stack,
+                error
+            });
+            throw error;
+        }
+    }
+
+    async promptStateDetails() {
+        return new Promise((resolve) => {
+            // Create modal div
+            const modalDiv = document.createElement('div');
+            modalDiv.className = 'modal-overlay save-state-dialog';
+            modalDiv.innerHTML = `
+                <div class="modal-content">
+                    <h2>Save State Details</h2>
+                    <div class="form-group">
+                        <label for="stateName">State Name *</label>
+                        <input type="text" id="stateName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="stateNotes">Notes (optional)</label>
+                        <textarea id="stateNotes" rows="3"></textarea>
+                    </div>
+                    <div class="button-container">
+                        <button type="button" class="cancel">Cancel</button>
+                        <button type="button" class="save">Save</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modalDiv);
+
+            // Handle save button click
+            const handleSave = () => {
+                const stateName = document.getElementById('stateName').value.trim();
+                const notes = document.getElementById('stateNotes').value.trim();
+
+                if (!stateName) {
+                    alert('Please enter a state name');
+                    return;
+                }
+
+                modalDiv.remove();
+                resolve({ stateName, notes, cancelled: false });
+            };
+
+            // Handle cancel
+            const handleCancel = () => {
+                modalDiv.remove();
+                resolve({ stateName: null, notes: null, cancelled: true });
+            };
+
+            // Add event listeners
+            modalDiv.querySelector('.save').addEventListener('click', handleSave);
+            modalDiv.querySelector('.cancel').addEventListener('click', handleCancel);
+        });
+    }
+
+    async getNextStateId() {
+        try {
+            // Get all values from the sheet
+            const response = await gapi.client.sheets.spreadsheets.values.get({
+                spreadsheetId: this.SPREADSHEET_ID,
+                range: 'Sheet1'  // Get all data
+            });
+
+            const values = response.result.values || [];
+            if (values.length === 0) return 1;  // Empty sheet
+
+            // Find the ID column index (should be last column)
+            const headers = values[0];
+            const idColumnIndex = headers.indexOf('ID');
+            
+            if (idColumnIndex === -1) return 1;  // No ID column yet
+
+            // Get all IDs, skipping header row
+            const ids = values.slice(1)
+                .map(row => row[idColumnIndex])
+                .filter(id => id && !isNaN(id))
+                .map(Number);
+
+            // Return max + 1, or 1 if no valid IDs
+            return ids.length > 0 ? Math.max(...ids) + 1 : 1;
+
+        } catch (error) {
+            console.error('Error getting next state ID:', {
+                message: error.message,
+                response: error.result,
+                status: error.status,
+                error
+            });
+            // Return 1 if there's an error
+            return 1;
+        }
+    }
+
 }
 
-export class TriangleSystem {
-    constructor(canvasId, ctx, rulesModule) {
+class TriangleSystem {
+    constructor(canvasId) {
         this.canvas = canvasId;
-        this.ctx = ctx;
-        this.rulesModule = rulesModule;
+        this.ctx = canvasId.getContext('2d');
         
         // Set up canvas dimensions
         this.canvas.width = canvasId.clientWidth;
@@ -36,9 +450,6 @@ export class TriangleSystem {
         // Transform to center origin and flip y-axis correctly
         this.ctx.translate(this.canvas.width/2, this.canvas.height/2);
         this.ctx.scale(1, -1);  // This flips the y-axis
-        
-        // Initialize CircleMetrics first
-        this.circleMetrics = new CircleMetrics(this);
         
         this.system = {};
         this.showConnections = true;
@@ -69,8 +480,9 @@ export class TriangleSystem {
         // Then initialize controls
         this.initializeEventListeners();
         this.initializeManualControls();
+        this.initializeAnimations();  // Changed from initializeAnimationControls
         
-        // Now safe to call updateDashboard
+        // Draw initial state
         this.drawSystem();
         this.updateDashboard();
         
@@ -81,7 +493,21 @@ export class TriangleSystem {
             const titleText = manualTitle.textContent;   
             
         }
+
+        // Initialize storage for user animations
+        this.userAnimations = JSON.parse(localStorage.getItem('userAnimations')) || {};
         
+        // Initialize the animations dropdown
+        this.initializeUserAnimations();
+        
+        // Add Save Animation button listener
+        const saveAnimationButton = document.getElementById('save-animation');
+        if (saveAnimationButton) {
+            saveAnimationButton.addEventListener('click', () => {
+                console.log('Save Animation button clicked');
+                this.saveCurrentAnimation();
+            });
+        }
 
         // Add to your constants/settings section at the top
         const SPECIAL_CENTERS_COLOR = '#FF69B4';  // Pink color for O, H, N
@@ -112,12 +538,24 @@ export class TriangleSystem {
         // Initialize subsystem metrics
         this.subsystemAreas = [0, 0, 0];  // Initialize array for three subsystems
         
-                // Add Save State button listener
+        // Bind save preset handler
+        document.getElementById('save-preset').addEventListener('click', () => this.saveCurrentConfig());
+
+        // Initialize database
+        this.db = new TriangleDatabase();
+        
+        // Add Save State button listener
         const saveStateButton = document.getElementById('saveState');
         if (saveStateButton) {
             const handleSaveClick = async () => {
                 console.log('Save State button clicked');
                 try {
+                    // Initialize database first
+                    
+                    if (!this.db.initialized) {
+                        await this.db.init();
+                    }
+
                     // Call saveState with our new explicit mapping approach
                     const result = await this.db.saveState();
 
@@ -144,6 +582,11 @@ export class TriangleSystem {
             console.error("Save State button not found");
         }
 
+        // Add export button listener
+        document.getElementById('exportData').addEventListener('click', () => {
+            this.db.exportToCSV();
+        });
+
         // Add new property for IC visibility
         this.showIC = false;
         
@@ -167,23 +610,166 @@ export class TriangleSystem {
         
         // Initialize managers
         this.importManager = new ImportManager(this);
+    }  // End of constructor
 
-        // Initialize CircleMetrics if not already done
-        if (!this.circleMetrics) {
-            this.circleMetrics = new CircleMetrics(this);
+    initializePresets() {
+        // Initialize storage if it doesn't exist
+        if (!localStorage.getItem('userPresets')) {
+            localStorage.setItem('userPresets', JSON.stringify({}));
+        }
+        
+        // Update presets dropdown
+        this.updatePresetsDropdown();
+    }
+    
+    // Separate method for initializing both dropdowns
+    initializeDropdowns() {
+        // Initialize both dropdowns
+        this.initializePresets();
+        this.initializeAnimations();
+        
+        // Update animations dropdown
+        this.updateAnimationsDropdown();
+    }
+
+    savePreset() {
+        // Get current NC values
+        const nc1 = document.getElementById('manual-nc1').value;
+        const nc2 = document.getElementById('manual-nc2').value;
+        const nc3 = document.getElementById('manual-nc3').value;
+
+        // Validate values
+        if (!nc1 || !nc2 || !nc3) {
+            alert('Please enter all NC values before saving a preset.');
+            return;
         }
 
-        // Add animation-related properties
-        this.animationLoop = null;
-        this.animationFrame = null;
+        // Prompt for preset name
+        const presetName = prompt('Enter a name for this preset:');
+        if (!presetName) return; // User cancelled
 
-        // Initialize CapacityModule with CircleMetrics
-        this.capacityModule = new CapacityModule(this.circleMetrics);
-    }  // End of constructor
+        try {
+            // Get existing presets
+            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+            
+            // Add new preset
+            presets[presetName] = {
+                nc1: parseFloat(nc1),
+                nc2: parseFloat(nc2),
+                nc3: parseFloat(nc3),
+                timestamp: Date.now() // Add timestamp for sorting
+            };
+            
+            // Save back to localStorage
+            localStorage.setItem('userPresets', JSON.stringify(presets));
+            
+            // Update dropdown
+            this.updatePresetsDropdown();
+            
+            console.log(`Saved preset: ${presetName}`, presets[presetName]); // Debug log
+            alert('Preset saved successfully!');
+        } catch (error) {
+            console.error('Error saving preset:', error);
+            alert('Error saving preset. Please try again.');
+        }
+    }
+
+    updatePresetsDropdown() {
+        const presetsList = document.getElementById('userPresetsList');
+        if (!presetsList) {
+            console.error('Presets list element not found');
+            return;
+        }
+        
+        try {
+            // Clear existing items
+            presetsList.innerHTML = '';
+            
+            // Get presets from storage and log them
+            const presetsString = localStorage.getItem('userPresets');
+            console.log('Raw presets from storage:', presetsString);
+            
+            const presets = JSON.parse(presetsString || '{}');
+            console.log('Parsed presets:', presets);
+            
+            // Sort presets alphabetically by name (case-insensitive)
+            const sortedPresets = Object.entries(presets)
+                .sort(([nameA], [nameB]) => nameA.toLowerCase().localeCompare(nameB.toLowerCase()));
+            console.log('Sorted presets:', sortedPresets);
+            
+            // Add presets to dropdown
+            sortedPresets.forEach(([name, values]) => {
+                console.log(`Creating dropdown item for preset: ${name}`, values);
+                
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = 'dropdown-item';
+                a.href = '#';
+                
+                // Create span for the text content
+                const textSpan = document.createElement('span');
+                const ncValues = `(${values.nc1}, ${values.nc2}, ${values.nc3})`;
+                textSpan.textContent = `${name} ${ncValues}`;
+                
+                // Create button container for edit and delete
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'preset-buttons';
+                
+                // Create edit button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-button small-button';
+                editBtn.textContent = '✎';
+                editBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const newName = prompt('Enter new name for preset:', name);
+                    if (newName && newName !== name) {
+                        this.renamePreset(name, newName, values);
+                    }
+                });
+                
+                // Create delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-button small-button';
+                deleteBtn.textContent = '×';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.deletePreset(name);
+                });
+                
+                // Append buttons to container
+                buttonContainer.appendChild(editBtn);
+                buttonContainer.appendChild(deleteBtn);
+                
+                // Append in correct order
+                a.appendChild(textSpan);
+                a.appendChild(buttonContainer);
+                li.appendChild(a);
+                presetsList.appendChild(li);
+                
+                // Add click handler for loading preset
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.loadPreset(name, values);
+                });
+            });
+            
+            console.log('Updated presets dropdown with', Object.keys(presets).length, 'items');
+            console.log('Final dropdown HTML:', presetsList.innerHTML);
+        } catch (error) {
+            console.error('Detailed error in updatePresetsDropdown:', {
+                error,
+                message: error.message,
+                stack: error.stack
+            });
+        }
+    }
 
     loadPreset(name, values) {
         try {
             
+
             // 1. Validate input values
             if (!values || typeof values !== 'object') {
                 throw new Error('Invalid preset values');
@@ -204,6 +790,8 @@ export class TriangleSystem {
                     y: parseFloat(values.n3?.y) || 0 
                 }
             };
+
+            
 
             // 3. Update system vertices
             this.system = {
@@ -304,9 +892,74 @@ export class TriangleSystem {
         this.canvas.addEventListener('mouseup', (e) => this.onMouseUp(e));
         this.canvas.addEventListener('mouseleave', (e) => this.onMouseUp(e));
 
+        // Add Save button listener with debug logs
+        console.log('Setting up Save button listener');
+        const saveButton = document.getElementById('save-preset');
+        if (saveButton) {
+            
+            saveButton.addEventListener('click', () => {
+                console.log('Save button clicked');
+                this.saveCurrentConfig();
+            });
+        } else {
+            console.error('Save button not found');
+        }
+
+        // Add Preset Dropdown Functionality
+        const presetDropdown = document.getElementById('userPresetsList');
+        const dropdownButton = document.getElementById('userPresetsDropdown');
+        
+        if (presetDropdown && dropdownButton) {
+            // Load saved presets from localStorage
+            const savedPresets = JSON.parse(localStorage.getItem('userPresets')) || {};
+            
+            
+            // Clear existing items
+            presetDropdown.innerHTML = '';
+            
+            // Add each preset to the dropdown
+            Object.entries(savedPresets).forEach(([name, config]) => {
+                const item = document.createElement('li');
+                const link = document.createElement('a');
+                link.className = 'dropdown-item';
+                link.href = '#';
+                link.textContent = name;
+                link.setAttribute('data-preset-name', name);  // Add data attribute
+                item.appendChild(link);
+                presetDropdown.appendChild(item);
+            });
+
+            // Add a single event listener to the dropdown container
+            presetDropdown.addEventListener('click', (e) => {
+                const link = e.target.closest('.dropdown-item');
+                if (!link) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                
+            });
+
+            // Initialize Bootstrap dropdown
+            dropdownButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('Dropdown button clicked');
+                presetDropdown.classList.toggle('show');
+            });
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!dropdownButton.contains(e.target) && !presetDropdown.contains(e.target)) {
+                    presetDropdown.classList.remove('show');
+                }
+            });
+            
+            
+        }
+
         // Add Export button listener with correct ID
         const exportButton = document.getElementById('exportData');
-        
+        console.log('Export button found:', !!exportButton); // Debug log
         
         if (exportButton) {
             exportButton.addEventListener('click', () => {
@@ -338,21 +991,7 @@ export class TriangleSystem {
             if (button) {
                 button.addEventListener('click', () => {
                     console.log('Animate button clicked');
-                    // Create animation object from current input values
-                    const animation = {
-                        start: {
-                            nc1: { x: parseFloat(document.getElementById('animation-nc1-start').value), y: 0 },
-                            nc2: { x: parseFloat(document.getElementById('animation-nc2-start').value), y: 0 },
-                            nc3: { x: parseFloat(document.getElementById('animation-nc3-start').value), y: 0 }
-                        },
-                        end: {
-                            nc1: { x: parseFloat(document.getElementById('animation-nc1-end').value), y: 0 },
-                            nc2: { x: parseFloat(document.getElementById('animation-nc2-end').value), y: 0 },
-                            nc3: { x: parseFloat(document.getElementById('animation-nc3-end').value), y: 0 }
-                        },
-                        loop: document.getElementById('animation-loop').checked
-                    };
-                    this.applyAnimation(animation);
+                    this.startAnimation();
                 });
             }
         });
@@ -363,32 +1002,7 @@ export class TriangleSystem {
             if (button) {
                 button.addEventListener('click', () => {
                     console.log('Save Animation button clicked');
-                    // Create animation object to save
-                    const animation = {
-                        start: {
-                            nc1: document.getElementById('animation-nc1-start').value,
-                            nc2: document.getElementById('animation-nc2-start').value,
-                            nc3: document.getElementById('animation-nc3-start').value
-                        },
-                        end: {
-                            nc1: document.getElementById('animation-nc1-end').value,
-                            nc2: document.getElementById('animation-nc2-end').value,
-                            nc3: document.getElementById('animation-nc3-end').value
-                        },
-                        loop: document.getElementById('animation-loop').checked
-                    };
-
-                    const name = prompt('Enter a name for this animation preset:');
-                    if (name) {
-                        try {
-                            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
-                            animations[name] = animation;
-                            localStorage.setItem('userAnimations', JSON.stringify(animations));
-                            console.log(`Animation preset "${name}" saved successfully`);
-                        } catch (error) {
-                            console.error('Error saving animation preset:', error);
-                        }
-                    }
+                    this.saveCurrentAnimation();
                 });
             }
         });
@@ -661,7 +1275,7 @@ export class TriangleSystem {
                 }
             };
 
-            
+            console.log('Centered triangle:', centeredTriangle);
 
             // Load the preset with the centered triangle
             return this.loadPreset(preset, centeredTriangle);
@@ -826,20 +1440,6 @@ export class TriangleSystem {
     }
 
     updateDashboard() {
-        // Check if circleMetrics exists before using it
-        if (this.circleMetrics) {
-            const metrics = this.circleMetrics.calculateExternalRegions();
-            
-            // Then notify capacity module if it exists
-            if (metrics && this.capacityModule) {
-                this.capacityModule.updateUtilizationPercentages(metrics);
-            }
-        }
-        
-        if (!this.rulesModule) {
-            
-            return;
-        }
         try {
             if (!this.isSystemInitialized()) {
                 console.log('System not fully initialized, skipping dashboard update');
@@ -1077,61 +1677,22 @@ export class TriangleSystem {
                     sphAreaRatioElement.value = ratio.toFixed(4);
                     areaSphRatioElement.value = (1 / ratio).toFixed(4);
                 }
-            }    
-        
-            // Calculate IC values (distances from centroid to vertices)
-            const ic1 = this.calculateDistance(centroid, this.system.n1);
-            const ic2 = this.calculateDistance(centroid, this.system.n2);
-            const ic3 = this.calculateDistance(centroid, this.system.n3);
-        
-            
-        
-            // Calculate I-Channel Entropy (HIC) as the sum of IC values
+            }  // Close the first if block
+
+            // Calculate I-Channel Entropy) - Update selectors to match HTML
+            const ic1 = parseFloat(document.getElementById('ic-1')?.value) || 0;
+            const ic2 = parseFloat(document.getElementById('ic-2')?.value) || 0;
+            const ic3 = parseFloat(document.getElementById('ic-3')?.value) || 0;
             const hic = ic1 + ic2 + ic3;
+            setElementValue('#system-mch', hic.toFixed(2));
             
-        
-            // Set IC values in the input fields
-            setElementValue('#ic-1', ic1.toFixed(2));
-            setElementValue('#ic-2', ic2.toFixed(2));
-            setElementValue('#ic-3', ic3.toFixed(2));
-        
-            // Set HIC value in the dashboard
-            setElementValue('#system-mch', hic.toFixed(2)); // Set the main HIC value
-            setElementValue('#mc-h', hic.toFixed(2));       // Set the alternative HIC display
-        
-            // Get System Perimeter Entropy (HP)
+
+            // Get System Perimeter Entropy (HP) - Update selector to match HTML
             const hp = parseFloat(document.querySelector('#system-sph')?.value) || 0;
-            
-                        
-            // Get system capacity (C)
-            const capacity = this.calculateArea();
-            
-        
-            // Calculate and set the ratios only if HIC is not zero
-            if (hic !== 0) {
-                if (capacity !== 0) {
-                    // HIC/C ratio
-                    setElementValue('#mch-b-ratio', (hic / capacity).toFixed(4));
-                    setElementValue('#b-mch-ratio', (capacity / hic).toFixed(4));
-                    
-                }
-                            
-                if (hp !== 0) {
-                    // HIC/HP ratio
-                    setElementValue('#hic-hp-ratio', (hic / hp).toFixed(4));
-                    setElementValue('#hp-hic-ratio', (hp / hic).toFixed(4));
-                    
-                }
-            } else {
-                console.warn('HIC is zero. Ratios dependent on HIC will not be calculated.');
-            }
-        
-            // Optionally, set Total System Entropy (H = HP + HIC)
+
+            // Calculate Total System Entropy (H = HP + MCH)
             const totalSystemEntropy = hp + hic;
             setElementValue('#system-h', totalSystemEntropy.toFixed(2));
-            console.log('Total System Entropy (H):', totalSystemEntropy);
-
-            
 
             // Get system capacity (C) value - Update selector to match HTML
             const systemCapacity = parseFloat(document.querySelector('#system-c')?.value) || 0;
@@ -1181,7 +1742,8 @@ export class TriangleSystem {
                     `${subcircle.center.x.toFixed(1)}, ${subcircle.center.y.toFixed(1)}`);
             }
 
-            
+            // Calculate new Capacity (C) value using area
+            const capacity = this.calculateArea();
             
             // Update capacity value in System Entropy and Capacity panel
             setElementValue('#system-c', capacity.toFixed(2));  // Keep original ID
@@ -1280,16 +1842,6 @@ export class TriangleSystem {
             if (hp !== 0 && hic !== 0) {
                 // HP/HIC and HIC/HP ratios
                 setElementValue('#hp-hic-ratio', (hp / hic).toFixed(4));
-                setElementValue('#hic-hp-ratio', (hic / hp).toFixed(4));
-            }
-
-            // Add HIC/C ratio calculation
-            if (capacity !== 0 && hic !== 0) {
-                setElementValue('#mch-b-ratio', (hic / capacity).toFixed(4));
-            }
-
-            // HIC/HP ratio is already being set above, but let's ensure it's visible
-            if (hp !== 0 && hic !== 0) {
                 setElementValue('#hic-hp-ratio', (hic / hp).toFixed(4));
             }
 
@@ -1545,57 +2097,6 @@ export class TriangleSystem {
                     }
                 });
             }
-
-            // Initialize CircleMetrics if not already done
-            if (!this.circleMetrics) {
-                this.circleMetrics = new CircleMetrics(this);
-            }
-
-            // Calculate and display circumcircle metrics
-            const circumcircleMetrics = this.circleMetrics.calculateCircumcircleMetrics();
-            let externalMetrics = this.circleMetrics.calculateExternalRegions();
-
-            // Calculate and display nine-point circle metrics
-            const metrics = this.circleMetrics.calculateNinePointCircleMetrics();
-            const regions = this.circleMetrics.calculateNinePointExternalRegions();
-
-            console.log('Received Nine-Point Circle Metrics:', metrics);
-            console.log('Updating dashboard with metrics:', { metrics, regions });
-
-            if (metrics && typeof metrics === 'object') {
-                // Update total area
-                if (metrics.area !== undefined) {
-                    this.setElementValue('#nine-point-area', metrics.area.toFixed(2));
-                }
-
-                // Update external and internal areas
-                if (regions && regions.totalExternal !== undefined) {
-                    this.setElementValue('#nine-point-external', regions.totalExternal.toFixed(2));
-                    
-                    // Calculate internal area as total - external
-                    const internalArea = metrics.area - regions.totalExternal;
-                    this.setElementValue('#nine-point-internal', internalArea.toFixed(2));
-                    
-                    // Calculate and display the ratio
-                    if (internalArea === 0) {
-                        this.setElementValue('#nine-point-ratio', '0.000');
-                    } else {
-                        const ratio = regions.totalExternal / internalArea;
-                        this.setElementValue('#nine-point-ratio', ratio.toFixed(3));
-                    }
-                }
-
-                // Debug check for HTML elements
-                console.log('Found elements:', {
-                    totalArea: document.querySelector('#nine-point-area') ? 'yes' : 'no',
-                    externalArea: document.querySelector('#nine-point-external') ? 'yes' : 'no',
-                    internalArea: document.querySelector('#nine-point-internal') ? 'yes' : 'no',
-                    areaRatio: document.querySelector('#nine-point-ratio') ? 'yes' : 'no'
-                });
-            }
-
-            // Notify metrics update
-            this.notifyMetricsUpdate();
 
         } catch (error) {
             console.error('Error updating dashboard:', error);
@@ -2548,9 +3049,6 @@ export class TriangleSystem {
         this.updateDerivedPoints();
         this.updateDashboard();
         this.drawSystem();
-
-        // Notify metrics update
-        this.notifyMetricsUpdate();
     }
 
     // Add new method for drawing just the incenter point
@@ -2750,7 +3248,8 @@ export class TriangleSystem {
         // Update rendering and dashboard
         this.drawSystem();
         this.updateDashboard();
-        // Remove this line to prevent automatic animation field updates  
+        // Remove this line to prevent automatic animation field updates
+        // this.updateAnimationFields();  
     }
 
     centerTriangle() {
@@ -2777,11 +3276,403 @@ export class TriangleSystem {
         };
     }
 
+    initializeAnimations() {
+        const animationsList = document.getElementById('animationsList');
+        if (!animationsList) {
+            console.error('Animations list element not found');
+            return;
+        }
+
+        try {
+            // Clear existing items
+            animationsList.innerHTML = '';
+            
+            // Get saved animations from localStorage
+            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+            
+            // Sort animation names alphabetically
+            const sortedNames = Object.keys(animations).sort();
+            
+            // Add each animation to the dropdown
+            sortedNames.forEach(name => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = 'dropdown-item';
+                a.href = '#';
+                
+                // Create span for the text content
+                const textSpan = document.createElement('span');
+                textSpan.textContent = name;
+                
+                // Create button container
+                const buttonContainer = document.createElement('div');
+                buttonContainer.className = 'preset-buttons';
+                
+                // Create delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-button small-button';  // instead of 'btn btn-danger btn-sm'
+                deleteBtn.textContent = '×';
+                deleteBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (confirm(`Delete animation "${name}"?`)) {
+                        this.deleteAnimation(name);
+                    }
+                });
+                
+                // Add click handler for loading animation - FIXED HERE
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const animationData = animations[name];  // Get the animation data
+                    this.loadAnimationPreset(name, animationData);  // Pass both name and data
+                });
+                
+                // Assemble the dropdown item
+                buttonContainer.appendChild(deleteBtn);
+                a.appendChild(textSpan);
+                a.appendChild(buttonContainer);
+                li.appendChild(a);
+                animationsList.appendChild(li);
+            });
+        } catch (error) {
+            console.error('Error initializing animations dropdown:', error);
+        }
+    }
+
+    // Remove or update the old loadAnimation method
+    loadAnimation(name) {
+        try {
+            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+            const animation = animations[name];
+            
+            if (!animation) {
+                console.error(`Animation "${name}" not found`);
+                return;
+            }
+
+            // Call the proper loading method
+            this.loadAnimationPreset(name, animation);
+        } catch (error) {
+            console.error('Error loading animation:', error);
+        }
+    }
+
+    updateAnimationEndFields() {
+        // Get current edge lengths with correct mapping
+        const animationEndInputs = {
+            'animation-nc2': this.calculateDistance(this.system.n1, this.system.n2),  // NC2 maps to blue edge
+            'animation-nc1': this.calculateDistance(this.system.n1, this.system.n3),  // NC1 maps to red edge
+            'animation-nc3': this.calculateDistance(this.system.n2, this.system.n3)   // NC3 maps to green edge
+        };
+
+        // Update each field while preserving editability
+        Object.entries(animationEndInputs).forEach(([id, value]) => {
+            const input = document.getElementById(`${id}-end`);
+            if (input && !input.matches(':focus')) {  // Don't update if user is editing
+                input.value = value.toFixed(2);
+                input.readOnly = false;
+            }
+        });
+    }
+
+    // Add method to clear stored animation
+    clearStoredAnimation() {
+        this.storedAnimation = null;
+    }
+
+    // Update initializeAnimationControls to clear stored animation when values change
+    initializeAnimationControls() {
+        const animateButton = document.getElementById('animate-button');
+        const animationInputs = document.querySelectorAll('[id^="animation-nc"]');
+
+        if (animateButton) {
+            animateButton.addEventListener('click', () => {
+                this.startAnimation();
+            });
+        }
+
+        // Clear stored animation when inputs change
+        animationInputs.forEach(input => {
+            input.addEventListener('input', () => {
+                this.clearStoredAnimation();
+            });
+        });
+    }
+
+    initializeUserPresets() {
+        console.log('Initializing user presets dropdown');
+        const userPresetsList = document.getElementById('userPresetsList');
+        
+        if (!userPresetsList) {
+            console.error('User presets list element not found');
+            return;
+        }
+        
+        // Clear existing items
+        userPresetsList.innerHTML = '';
+        
+        // Add each saved preset
+        Object.entries(this.userPresets).forEach(([name, config]) => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.className = 'dropdown-item';
+            link.href = '#';
+            link.textContent = name;
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.loadUserPreset(name);
+            });
+            item.appendChild(link);
+            userPresetsList.appendChild(item);
+        });
+    }
+
+    loadUserPreset(name) {
+        const config = this.userPresets[name];
+        if (config) {
+            // Load the configuration
+            this.system.n1.x = config.n1.x;
+            this.system.n1.y = config.n1.y;
+            this.system.n2.x = config.n2.x;
+            this.system.n2.y = config.n2.y;
+            this.system.n3.x = config.n3.x;
+            this.system.n3.y = config.n3.y;
+
+            // Update display
+            this.drawSystem();
+            this.updateDashboard();
+        }
+    }
+
+    saveCurrentConfig() {
+        
+        // Get current NC values
+        const nc1 = document.getElementById('manual-nc1')?.value;
+        const nc2 = document.getElementById('manual-nc2')?.value;
+        const nc3 = document.getElementById('manual-nc3')?.value;
+        
+        // Validate values
+        if (!nc1 || !nc2 || !nc3) {
+            alert('Please enter all NC values before saving a preset.');
+            return;
+        }
+
+        // Get current triangle configuration
+        const config = {
+            n1: { x: this.system.n1.x, y: this.system.n1.y },
+            n2: { x: this.system.n2.x, y: this.system.n2.y },
+            n3: { x: this.system.n3.x, y: this.system.n3.y },
+            nc1: parseFloat(nc1),
+            nc2: parseFloat(nc2),
+            nc3: parseFloat(nc3),
+            timestamp: Date.now()
+        };
+
+        // Single prompt for preset name
+        const name = prompt('Enter a name for this preset:');
+        
+        if (name) {
+            try {
+                // Get existing presets
+                const existingPresets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+                
+                // Add new preset
+                existingPresets[name] = config;
+                
+                // Save to localStorage
+                localStorage.setItem('userPresets', JSON.stringify(existingPresets));
+                
+                // Update dropdown immediately
+                this.updatePresetsDropdown();
+                
+                alert('Preset saved successfully!');
+
+            } catch (error) {
+                console.error('Error saving preset:', error);
+                alert('Error saving preset. Please try again.');
+            }
+        
+        }
+    }
+
     checkInputFields() {
         const inputFields = document.querySelectorAll('input[type="text"]:not(.manual-input):not([readonly="false"])');
         inputFields.forEach(field => {
             field.readOnly = true;
         });
+    }
+
+    saveCurrentAnimation() {
+        try {
+            const name = prompt('Enter a name for this animation:');
+            if (!name) return;
+
+            // Get start values from start input fields
+            const startState = {
+                nc1: parseFloat(document.getElementById('animation-nc1-start').value),
+                nc2: parseFloat(document.getElementById('animation-nc2-start').value),
+                nc3: parseFloat(document.getElementById('animation-nc3-start').value)
+            };
+
+            // Get end values from end input fields
+            const endState = {
+                nc1: parseFloat(document.getElementById('animation-nc1-end').value),
+                nc2: parseFloat(document.getElementById('animation-nc2-end').value),
+                nc3: parseFloat(document.getElementById('animation-nc3-end').value)
+            };
+
+            // Create animation data
+            const animationData = {
+                start: startState,
+                end: endState
+            };
+
+            // Save to localStorage
+            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+            animations[name] = animationData;
+            localStorage.setItem('userAnimations', JSON.stringify(animations));
+
+            this.initializeAnimations();
+            console.log(`Successfully saved animation "${name}"`, animationData);
+        } catch (error) {
+            console.error('Error saving animation:', error);
+            alert('Error saving animation. Please try again.');
+        }
+    }
+
+    // Add new method to initialize animations dropdown
+    initializeUserAnimations() {
+        const animationsList = document.getElementById('animationsList');
+        const animationsDropdown = document.getElementById('animationsDropdown');
+        
+        if (!animationsList || !animationsDropdown) {
+            console.error('Animation dropdown elements not found');
+            return;
+        }
+        
+        // Clear existing items
+        animationsList.innerHTML = '';
+        
+        // Add each saved animation to dropdown
+        Object.entries(this.userAnimations).forEach(([name, config]) => {
+            const item = document.createElement('li');
+            const link = document.createElement('a');
+            link.className = 'dropdown-item';
+            link.href = '#';
+            link.textContent = name;
+            item.appendChild(link);
+            animationsList.appendChild(item);
+        });
+
+        // Initialize Bootstrap dropdown functionality
+        animationsDropdown.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Animations dropdown clicked');
+            animationsList.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!animationsDropdown.contains(e.target) && !animationsList.contains(e.target)) {
+                animationsList.classList.remove('show');
+            }
+        });
+    }
+
+    // Add this method if it doesn't exist, or update it if it does
+    updateAnimationFields() {
+        // Get current lengths
+        const currentLengths = this.calculateLengths();
+
+        // Update Animation Start fields
+        const startNc1Input = document.getElementById('animation-nc1-start');
+        const startNc2Input = document.getElementById('animation-nc2-start');
+        const startNc3Input = document.getElementById('animation-nc3-start');
+
+        if (startNc1Input && startNc2Input && startNc3Input) {
+            startNc1Input.value = currentLengths.l1.toFixed(2);
+            startNc2Input.value = currentLengths.l2.toFixed(2);
+            startNc3Input.value = currentLengths.l3.toFixed(2);
+            
+        } else {
+            console.error('Some animation start input fields not found');
+        }
+
+        // Update Animation End fields
+        const endNc1Input = document.getElementById('animation-nc1-end');
+        const endNc2Input = document.getElementById('animation-nc2-end');
+        const endNc3Input = document.getElementById('animation-nc3-end');
+
+        if (endNc1Input && endNc2Input && endNc3Input) {
+            endNc1Input.value = currentLengths.l1.toFixed(2);
+            endNc2Input.value = currentLengths.l2.toFixed(2);
+            endNc3Input.value = currentLengths.l3.toFixed(2);
+            console.log('Updated end fields');
+        } else {
+            console.error('Some animation end input fields not found');
+        }
+    }
+
+    exportToCSV() {
+        console.log('Exporting data');
+        
+        // Initialize CSV content with headers
+        let csvContent = "data:text/csv;charset=utf-8,Section,Label,Value\n";
+
+        // Function to process a panel's data
+        const processPanel = (panel, sectionName) => {
+            console.log(`Processing section: ${sectionName}`);
+            // Get all label-value pairs
+            const labelValuePairs = panel.querySelectorAll('.label-value-pair');
+            console.log(`Found ${labelValuePairs.length} label-value pairs`);
+            labelValuePairs.forEach(pair => {
+                const label = pair.querySelector('label')?.textContent.trim() || '';
+                const value = pair.querySelector('input')?.value || '';
+                console.log(`Found pair - Label: ${label}, Value: ${value}`);
+                csvContent += `"${sectionName}","${label}","${value}"\n`;
+            });
+
+            // Special handling for subsystems table if it exists
+            const subsystemsTable = panel.querySelector('.subsystems-table');
+            if (subsystemsTable) {
+                const headers = Array.from(subsystemsTable.querySelectorAll('thead th'))
+                    .map(th => th.textContent.trim())
+                    .filter(text => text !== '');
+                
+                const rows = subsystemsTable.querySelectorAll('tbody tr');
+                rows.forEach(row => {
+                    const rowHeader = row.querySelector('th').textContent.trim();
+                    const inputs = row.querySelectorAll('input');
+                    inputs.forEach((input, index) => {
+                        const label = `${rowHeader} ${headers[index]}`;
+                        csvContent += `"${sectionName}","${label}","${input.value}"\n`;
+                    });
+                });
+            }
+        };
+
+        // Process Dashboard sections
+        const dashboard = document.getElementById('dashboard');
+        if (dashboard) {
+            // Get all dashboard panels
+            const panels = dashboard.querySelectorAll('.dashboard-panel');
+            panels.forEach(panel => {
+                const sectionTitle = panel.querySelector('.panel-header')?.textContent.trim() || 'Unnamed Section';
+                processPanel(panel, sectionTitle);
+            });
+        }
+
+        // Create and trigger download
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "triangle_data.csv");
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log('Export complete');
     }
 
     // Add new method for image export
@@ -3207,13 +4098,300 @@ export class TriangleSystem {
             return null;
         }
     }
-    
-    startAnimation() {
-        this.presetManager.startAnimation();
+
+    renamePreset(oldName, newName, values) {
+        try {
+            // Get existing presets
+            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+            
+            // Delete old name and add with new name
+            delete presets[oldName];
+            presets[newName] = values;
+            
+            // Save back to localStorage
+            localStorage.setItem('userPresets', JSON.stringify(presets));
+            
+            // Update dropdown
+            this.updatePresetsDropdown();
+            
+            console.log(`Renamed preset from "${oldName}" to "${newName}"`);
+        } catch (error) {
+            console.error('Error renaming preset:', error);
+            alert('Error renaming preset. Please try again.');
+        }
     }
 
-    stopAnimation() {
-        this.presetManager.stopAnimation();
+    updateAnimationsDropdown() {
+        const animationsList = document.getElementById('animationsList');
+        if (!animationsList) {
+            console.error('Animations list element not found');
+            return;
+        }
+        
+        try {
+            // Clear existing items
+            animationsList.innerHTML = '';
+            
+            // Get animations from storage
+            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+            
+            // Sort animations alphabetically by name (case-insensitive)
+            const sortedAnimations = Object.entries(animations)
+                .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
+            
+            if (sortedAnimations.length > 0) {
+                sortedAnimations.forEach(([name, config]) => {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.className = 'dropdown-item';
+                    a.href = '#';
+                    
+                    // Create container for name and buttons
+                    const container = document.createElement('div');
+                    container.className = 'preset-item-container';
+                    
+                    // Add animation name
+                    const nameSpan = document.createElement('span');
+                    nameSpan.className = 'preset-name';
+                    nameSpan.textContent = name;
+                    container.appendChild(nameSpan);
+                    
+                    // Add edit button
+                    const editBtn = document.createElement('button');
+                    editBtn.className = 'edit-btn';
+                    editBtn.innerHTML = '✎';
+                    editBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        this.editAnimation(name, config);
+                    };
+                    container.appendChild(editBtn);
+                    
+                    // Add delete button
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'delete-btn';
+                    deleteBtn.innerHTML = '×';
+                    deleteBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        this.deleteAnimation(name);
+                    };
+                    container.appendChild(deleteBtn);
+                    
+                    a.appendChild(container);
+                    li.appendChild(a);
+                    this.animationsList.appendChild(li);
+                    
+                    // Add click handler for loading animation
+                    a.onclick = (e) => {
+                        e.preventDefault();
+                        this.playAnimation(name, config);
+                    };
+                });
+            } else {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = 'dropdown-item disabled';
+                a.href = '#';
+                a.textContent = 'No saved animations';
+                li.appendChild(a);
+                this.animationsList.appendChild(li);
+            }
+            
+        } catch (error) {
+            console.error('Error updating animations dropdown:', error);
+        }
+    }
+
+    // Add these new methods to handle editing and deleting animations
+    editAnimation(name, config) {
+        const newName = prompt('Enter new name for animation:', name);
+        if (newName && newName !== name) {
+            try {
+                // Get current animations
+                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+                
+                // Delete old name and add with new name
+                delete animations[name];
+                animations[newName] = config;
+                
+                // Save back to storage
+                localStorage.setItem('userAnimations', JSON.stringify(animations));
+                
+                // Refresh dropdown
+                this.initializeAnimationsDropdown();
+                
+                console.log('Animation renamed:', name, 'to', newName);
+            } catch (error) {
+                console.error('Error editing animation:', error);
+                alert('Error editing animation. Please try again.');
+            }
+        }
+    }
+
+    deleteAnimation(name) {
+        if (confirm(`Are you sure you want to delete the animation "${name}"?`)) {
+            try {
+                // Get current animations
+                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+                
+                // Delete the animation
+                delete animations[name];
+                
+                // Save back to storage
+                localStorage.setItem('userAnimations', JSON.stringify(animations));
+                
+                // Refresh dropdown
+                this.initializeAnimationsDropdown();
+                
+                console.log('Animation deleted:', name);
+            } catch (error) {
+                console.error('Error deleting animation:', error);
+                alert('Error deleting animation. Please try again.');
+            }
+        }
+    }
+
+    // Add or update the startAnimation method
+    startAnimation() {
+        try {
+            // Get start values from input fields
+            const startState = {
+                nc1: parseFloat(document.getElementById('animation-nc1-start').value),
+                nc2: parseFloat(document.getElementById('animation-nc2-start').value),
+                nc3: parseFloat(document.getElementById('animation-nc3-start').value)
+            };
+
+            // Get end values from input fields
+            const endState = {
+                nc1: parseFloat(document.getElementById('animation-nc1-end').value),
+                nc2: parseFloat(document.getElementById('animation-nc2-end').value),
+                nc3: parseFloat(document.getElementById('animation-nc3-end').value)
+            };
+
+            // Check if animation is already running
+            if (this.isAnimating) {
+                this.isAnimating = false;
+                return;
+            }
+
+            // First reset to start position
+            this.updateTriangleFromEdges(startState.nc1, startState.nc2, startState.nc3);
+            
+            // Animation parameters
+            const duration = 4000; // 4 seconds
+            let startTime = performance.now(); // Changed to let
+            let forward = true;
+            this.isAnimating = true;
+
+            // Animation function
+            const animate = (currentTime) => {
+                if (!this.isAnimating) return;
+
+                const elapsed = currentTime - startTime;
+                let progress = (elapsed % duration) / duration;
+                const loopCheckbox = document.getElementById('animation-loop');
+                const isLooping = loopCheckbox?.checked;
+
+                // Handle single play vs loop
+                if (!isLooping && elapsed >= duration) {
+                    // For single play, stop at end state
+                    this.updateTriangleFromEdges(endState.nc1, endState.nc2, endState.nc3);
+                    this.isAnimating = false;
+                    return;
+                } else if (isLooping && elapsed >= duration) {
+                    // For loop, reverse direction and reset start time
+                    forward = !forward; // Simplified direction toggle
+                    startTime = currentTime; // Reset start time for next loop
+                    progress = 0; // Reset progress
+                }
+
+                const effectiveProgress = forward ? progress : 1 - progress;
+
+                // Calculate current values
+                const current = {
+                    nc1: startState.nc1 + (endState.nc1 - startState.nc1) * effectiveProgress,
+                    nc2: startState.nc2 + (endState.nc2 - startState.nc2) * effectiveProgress,
+                    nc3: startState.nc3 + (endState.nc3 - startState.nc3) * effectiveProgress
+                };
+
+                // Update triangle with current values
+                this.updateTriangleFromEdges(current.nc1, current.nc2, current.nc3);
+                
+                // Continue animation
+                if (this.isAnimating) {
+                    requestAnimationFrame(animate);
+                }
+            };
+
+            // Start animation
+            requestAnimationFrame(animate);
+
+        } catch (error) {
+            console.error('Error in startAnimation:', error);
+            this.isAnimating = false;
+        }
+    }
+
+    loadAnimationPreset(name, values) {
+        try {
+            console.log('Loading animation preset:', name);
+            console.log('Values received:', values);
+            
+            // First update end fields if they exist in the preset
+            if (values.end) {
+                console.log('Setting end values:', values.end);
+                const endFields = {
+                    'animation-nc1-end': values.end.nc1,
+                    'animation-nc2-end': values.end.nc2,
+                    'animation-nc3-end': values.end.nc3
+                };
+
+                Object.entries(endFields).forEach(([id, value]) => {
+                    const input = document.getElementById(id);
+                    if (input) {
+                        input.value = Number(value).toFixed(2);
+                        console.log(`Set ${id} to ${input.value}`);
+                    }
+                });
+            }
+            
+            // Then update start fields and triangle position
+            if (values.start) {
+                console.log('Setting start values:', values.start);
+                
+                // Update start input fields
+                const startFields = {
+                    'animation-nc1-start': values.start.nc1,
+                    'animation-nc2-start': values.start.nc2,
+                    'animation-nc3-start': values.start.nc3
+                };
+
+                Object.entries(startFields).forEach(([id, value]) => {
+                    const input = document.getElementById(id);
+                    if (input) {
+                        input.value = Number(value).toFixed(2);
+                        console.log(`Set ${id} to ${input.value}`);
+                    }
+                });
+
+                // Update the current triangle to match start state
+                console.log('Updating triangle with start values:', values.start);
+                this.updateTriangleFromEdges(
+                    values.start.nc1,
+                    values.start.nc2,
+                    values.start.nc3
+                );
+            }
+            
+            // Redraw and update
+            this.drawSystem();
+            this.updateDashboard();
+            
+            console.log('Successfully loaded animation preset');
+        } catch (error) {
+            console.error('Error loading animation preset:', error);
+            console.error('Error details:', error.message);
+            alert('Error loading animation preset. Please check the console for details.');
+        }
     }
 
     // Add this method to update triangle dimensions
@@ -3238,6 +4416,51 @@ export class TriangleSystem {
             this.updateDashboard();
         } catch (error) {
             console.error('Error in updateTriangle:', error);
+        }
+    }
+
+    saveAnimation(name) {
+        try {
+            // Get start values from current triangle state
+            const startValues = {
+                nc1: this.calculateDistance(this.system.n1, this.system.n3),
+                nc2: this.calculateDistance(this.system.n1, this.system.n2),
+                nc3: this.calculateDistance(this.system.n2, this.system.n3)
+            };
+
+            // Get end values from inputs
+            const endValues = {
+                nc1: parseFloat(document.getElementById('animation-nc1-end').value),
+                nc2: parseFloat(document.getElementById('animation-nc2-end').value),
+                nc3: parseFloat(document.getElementById('animation-nc3-end').value)
+            };
+
+            // Log the values being saved
+            console.log('Saving animation with values:', {
+                name,
+                start: startValues,
+                end: endValues
+            });
+
+            // Get existing animations
+            const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+            
+            // Save both start and end values
+            animations[name] = {
+                start: startValues,
+                end: endValues
+            };
+            
+            // Save to localStorage
+            localStorage.setItem('userAnimations', JSON.stringify(animations));
+            
+            // Update dropdown
+            this.updateAnimationsDropdown();
+            
+            console.log('Successfully saved animation:', name);
+        } catch (error) {
+            console.error('Error saving animation:', error);
+            alert('Error saving animation. Please try again.');
         }
     }
 
@@ -3470,6 +4693,8 @@ export class TriangleSystem {
                 'manual-ic3': this.calculateDistance(centroid, this.system.n3)   // I to Node 3
             };
 
+            
+
             // Update Manual IC Fields while preserving editability
             Object.entries(icValues).forEach(([id, value]) => {
                 const input = document.getElementById(id);
@@ -3485,6 +4710,8 @@ export class TriangleSystem {
                 'ic-2': icValues['manual-ic2'].toFixed(2),  // Changed from d-ic2
                 'ic-3': icValues['manual-ic3'].toFixed(2)   // Changed from d-ic3
             };
+
+            
 
             Object.entries(dashboardICValues).forEach(([id, value]) => {
                 const input = document.getElementById(id);
@@ -3930,6 +5157,7 @@ export class TriangleSystem {
             if (elAngle < 0) elAngle += 360;
             
             
+            
             const ncs = [
                 { id: 'nc1', points: [this.system.n1, this.system.n3] },
                 { id: 'nc2', points: [this.system.n1, this.system.n2] },
@@ -3960,6 +5188,7 @@ export class TriangleSystem {
                     let angleDiff = Math.abs(ncAngle - elAngle);
                     if (angleDiff > 180) angleDiff = 360 - angleDiff;
                     if (angleDiff > 90) angleDiff = 180 - angleDiff;
+                    
                     
                     
                     angles[`${nc.id}_acute`] = angleDiff.toFixed(2);
@@ -4098,6 +5327,7 @@ export class TriangleSystem {
                 const rMTNC = ncLength !== 0 ? dMT / ncLength : 0;
                 
                 
+                
                 const input = document.getElementById(`r-m-t-nc${i}`);
                 if (input) {
                     input.value = rMTNC.toFixed(4);
@@ -4173,6 +5403,7 @@ export class TriangleSystem {
         try {
             const centroid = this.calculateCentroid();
             const totalSystemEntropy = this.calculateTotalEntropy();
+            
             
             
             for (let i =1; i <= 3; i++) {
@@ -4301,7 +5532,73 @@ export class TriangleSystem {
         this.drawTextWithShadow(ctx, length.toFixed(2), x, y, '10px');
     }
 
-    
+    // Add this method to handle the loop animation
+    startLoopAnimation() {
+        if (this.isAnimating) {
+            this.isAnimating = false;
+            if (this.animationLoop) {
+                cancelAnimationFrame(this.animationLoop);
+                this.animationLoop = null;
+            }
+            return;
+        }
+
+        const startState = {
+            nc1: parseFloat(document.getElementById('animation-nc1-start').value),
+            nc2: parseFloat(document.getElementById('animation-nc2-start').value),
+            nc3: parseFloat(document.getElementById('animation-nc3-start').value)
+        };
+
+        const endState = {
+            nc1: parseFloat(document.getElementById('animation-nc1-end').value),
+            nc2: parseFloat(document.getElementById('animation-nc2-end').value),
+            nc3: parseFloat(document.getElementById('animation-nc3-end').value)
+        };
+
+        this.isAnimating = true;
+        const duration = 4000;
+        let startTime = performance.now();
+        let forward = true;
+
+        const animate = (currentTime) => {
+            if (!this.isAnimating) return;
+
+            const elapsed = currentTime - startTime;
+            let progress = (elapsed % duration) / duration;
+            const loopCheckbox = document.getElementById('animation-loop');
+            const isLooping = loopCheckbox?.checked;
+
+            // Handle single play vs loop
+            if (!isLooping && elapsed >= duration) {
+                // For single play, stop at end state
+                this.updateTriangleFromEdges(endState.nc1, endState.nc2, endState.nc3);
+                this.isAnimating = false;
+                return;
+            } else if (isLooping && elapsed >= duration) {
+                // For loop, reverse direction and reset start time
+                forward = !forward; // Simplified direction toggle
+                startTime = currentTime; // Reset start time for next loop
+                progress = 0; // Reset progress
+            }
+
+            const effectiveProgress = forward ? progress : 1 - progress;
+
+            // Calculate current values
+            const current = {
+                nc1: startState.nc1 + (endState.nc1 - startState.nc1) * effectiveProgress,
+                nc2: startState.nc2 + (endState.nc2 - startState.nc2) * effectiveProgress,
+                nc3: startState.nc3 + (endState.nc3 - startState.nc3) * effectiveProgress
+            };
+
+            // Update triangle
+            this.updateTriangleFromEdges(current.nc1, current.nc2, current.nc3);
+            
+            // Continue loop
+            this.animationLoop = requestAnimationFrame(animate);
+        };
+
+        this.animationLoop = requestAnimationFrame(animate);
+    }
 
     drawICLines(ctx) {
         if (!this.system.n1 || !this.system.n2 || !this.system.n3) return;
@@ -4532,7 +5829,7 @@ export class TriangleSystem {
         });
 
         // Now initialize each search box
-        for (let i =1; i <= 3; i++) {
+        for (let i = 1; i <= 3; i++) {
             const searchInput = document.getElementById(`info-search-${i}`);
             const searchResults = document.getElementById(`search-results-${i}`);
             const displayValue = document.getElementById(`info-display-value-${i}`);
@@ -4858,116 +6155,755 @@ export class TriangleSystem {
         }
     }
 
-    calculateCurrentState(start, end, progress) {
-        return {
-            nc1: start.nc1 + (end.nc1 - start.nc1) * progress,
-            nc2: start.nc2 + (end.nc2 - start.nc2) * progress,
-            nc3: start.nc3 + (end.nc3 - start.nc3) * progress
-        };
-    }
-    
-    getAnimationValues() {
-        // Get current triangle state values
-        return {
-            start: {
-                nc1: this.calculateDistance(this.system.n1, this.system.n3),
-                nc2: this.calculateDistance(this.system.n1, this.system.n2),
-                nc3: this.calculateDistance(this.system.n2, this.system.n3)
-            }
-        };
-    }
+    deletePreset(name) {
+        if (!confirm(`Are you sure you want to delete the preset "${name}"?`)) return;
 
-    // Add this method to handle animation presets
-    applyAnimation(animation) {
-        console.log('TriangleSystem.applyAnimation called with:', animation);
-        
-        if (!animation || !animation.start || !animation.end) {
-            console.error('Invalid animation format');
-            return;
+        try {
+            // Get existing presets
+            const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+            
+            // Delete preset
+            delete presets[name];
+            
+            // Save back to localStorage
+            localStorage.setItem('userPresets', JSON.stringify(presets));
+            
+            // Update dropdown
+            this.updatePresetsDropdown();
+            
+        } catch (error) {
+            console.error('Error deleting preset:', error);
+            alert('Error deleting preset. Please try again.');
         }
-
-        // Stop any existing animation
-        if (this.isAnimating) {
-            this.stopAnimation();
-        }
-
-        const duration = 2000; // 2 seconds
-        const startTime = performance.now();
-        this.isAnimating = true;
-
-        const animate = (currentTime) => {
-            if (!this.isAnimating) {
-                console.log('Animation stopped');
-                return;
-            }
-
-            const elapsed = currentTime - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-
-            // Update triangle coordinates
-            this.system.n1.x = this.lerp(animation.start.nc1.x, animation.end.nc1.x, progress);
-            this.system.n2.x = this.lerp(animation.start.nc2.x, animation.end.nc2.x, progress);
-            this.system.n3.x = this.lerp(animation.start.nc3.x, animation.end.nc3.x, progress);
-
-            // Redraw the system
-            this.updateDerivedPoints();
-            this.drawSystem();
-            this.updateDashboard();
-
-            if (progress < 1) {
-                this.animationFrame = requestAnimationFrame(animate);
-            } else if (animation.loop) {
-                // If looping is enabled, restart the animation
-                this.animationFrame = requestAnimationFrame(() => {
-                    this.applyAnimation(animation);
-                });
-            } else {
-                this.isAnimating = false;
-                console.log('Animation completed');
-            }
-        };
-
-        // Start the animation
-        this.animationFrame = requestAnimationFrame(animate);
-    }
-
-    // Helper method for linear interpolation
-    lerp(start, end, progress) {
-        return start + (end - start) * progress;
-    }
-
-    // Method to stop animation
-    stopAnimation() {
-        this.isAnimating = false;
-        if (this.animationFrame) {
-            cancelAnimationFrame(this.animationFrame);
-            this.animationFrame = null;
-        }
-    }
-
-    // Add this method to notify of triangle updates
-    notifyMetricsUpdate() {
-        console.log('Triangle notifying of metrics update');
-        const metrics = this.circleMetrics.calculateExternalRegions();
-        if (metrics && this.capacityModule) {
-            this.capacityModule.updateUtilizationPercentages(metrics);
-        }
-    }
-
-    // Add this to any method that updates triangle positions
-    updateTriangleState() {
-        // ... existing update code ...
-        this.notifyMetricsUpdate();
-    }
-
-    // Also add to drag handling
-    handleDrag(event) {
-        // ... existing drag code ...
-        this.notifyMetricsUpdate();
     }
 }
 
+class PresetManager {
+    constructor(triangleSystem) {
+        this.triangleSystem = triangleSystem;
+        
+        // Remove any existing click handlers
+        const existingPresetItems = document.querySelectorAll('.dropdown-item[data-preset-name]');
+        existingPresetItems.forEach(item => {
+            item.removeEventListener('click', null);
+        });
+        
+        // Initialize dropdowns
+        this.userPresetsDropdown = document.getElementById('userPresetsDropdown');
+        this.presetsList = document.getElementById('userPresetsList');
+        this.animationsDropdown = document.getElementById('animationsDropdown');
+        this.animationsList = document.getElementById('animationsList');
+        
+        this.initializePresetsDropdown();
+        this.initializeAnimationsDropdown();
+        this.setupEventListeners();
+    }
 
+    initializePresetsDropdown() {
+        if (!this.userPresetsDropdown || !this.presetsList) {
+            console.error('Presets dropdown elements not found');
+            return;
+        }
 
+        // Remove old event listeners
+        const oldItems = this.presetsList.querySelectorAll('.dropdown-item');
+        oldItems.forEach(item => {
+            item.replaceWith(item.cloneNode(true));
+        });
+
+        // Get presets from storage and convert to sorted array
+        const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+        const sortedPresets = Object.entries(presets)
+            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
+        
+        // Clear and populate dropdown
+        this.presetsList.innerHTML = '';
+        
+        sortedPresets.forEach(([name, values]) => {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.className = 'dropdown-item';
+            a.href = '#';
+            
+            // Create container for name and buttons
+            const container = document.createElement('div');
+            container.className = 'preset-item-container';
+            
+            // Add preset name
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'preset-name';
+            nameSpan.textContent = name;
+            container.appendChild(nameSpan);
+            
+            // Add edit button
+            const editBtn = document.createElement('button');
+            editBtn.className = 'edit-btn';
+            editBtn.innerHTML = '✎';
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.editPreset(name, values);
+            };
+            container.appendChild(editBtn);
+            
+            // Add delete button
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn';
+            deleteBtn.innerHTML = '×';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                this.deletePreset(name);
+            };
+            container.appendChild(deleteBtn);
+            
+            a.appendChild(container);
+            li.appendChild(a);
+            this.presetsList.appendChild(li);
+            
+            // Add click handler for loading preset
+            a.onclick = (e) => {
+                e.preventDefault();
+                this.loadPreset(name, values);
+            };
+        });
+    }
+
+    initializeAnimationsDropdown() {
+        if (!this.animationsDropdown || !this.animationsList) {
+            console.error('Animations dropdown elements not found');
+            return;
+        }
+
+        // Clear existing items
+        this.animationsList.innerHTML = '';
+
+        // Get saved animations and sort alphabetically
+        const savedAnimations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+        const sortedAnimations = Object.entries(savedAnimations)
+            .sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
+        
+        if (sortedAnimations.length > 0) {
+            sortedAnimations.forEach(([name, config]) => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                a.className = 'dropdown-item';
+                a.href = '#';
+                
+                // Create container for name and buttons
+                const container = document.createElement('div');
+                container.className = 'preset-item-container';
+                
+                // Add animation name
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'preset-name';
+                nameSpan.textContent = name;
+                container.appendChild(nameSpan);
+                
+                // Add edit button
+                const editBtn = document.createElement('button');
+                editBtn.className = 'edit-btn';
+                editBtn.innerHTML = '✎';
+                editBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.editAnimation(name, config);
+                };
+                container.appendChild(editBtn);
+                
+                // Add delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-btn';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    this.deleteAnimation(name);
+                };
+                container.appendChild(deleteBtn);
+                
+                a.appendChild(container);
+                li.appendChild(a);
+                this.animationsList.appendChild(li);
+                
+                // Add click handler for loading animation
+                a.onclick = (e) => {
+                    e.preventDefault();
+                    this.playAnimation(name, config);
+                };
+            });
+        } else {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.className = 'dropdown-item disabled';
+            a.href = '#';
+            a.textContent = 'No saved animations';
+            li.appendChild(a);
+            this.animationsList.appendChild(li);
+        }
+    }
+
+    // Add these new methods to handle editing and deleting animations
+    editAnimation(name, config) {
+        const newName = prompt('Enter new name for animation:', name);
+        if (newName && newName !== name) {
+            try {
+                // Get current animations
+                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+                
+                // Delete old name and add with new name
+                delete animations[name];
+                animations[newName] = config;
+                
+                // Save back to storage
+                localStorage.setItem('userAnimations', JSON.stringify(animations));
+                
+                // Refresh dropdown
+                this.initializeAnimationsDropdown();
+                
+                console.log('Animation renamed:', name, 'to', newName);
+            } catch (error) {
+                console.error('Error editing animation:', error);
+                alert('Error editing animation. Please try again.');
+            }
+        }
+    }
+
+    deleteAnimation(name) {
+        if (confirm(`Are you sure you want to delete the animation "${name}"?`)) {
+            try {
+                // Get current animations
+                const animations = JSON.parse(localStorage.getItem('userAnimations') || '{}');
+                
+                // Delete the animation
+                delete animations[name];
+                
+                // Save back to storage
+                localStorage.setItem('userAnimations', JSON.stringify(animations));
+                
+                // Refresh dropdown
+                this.initializeAnimationsDropdown();
+                
+                console.log('Animation deleted:', name);
+            } catch (error) {
+                console.error('Error deleting animation:', error);
+                alert('Error deleting animation. Please try again.');
+            }
+        }
+    }
+
+    setupEventListeners() {
+        // Presets dropdown toggle
+        this.userPresetsDropdown.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Toggle presets dropdown');
+            this.presetsList.classList.toggle('show');
+        });
+
+        // Animations dropdown toggle
+        this.animationsDropdown.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Toggle animations dropdown');
+            this.animationsList.classList.toggle('show');
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!this.userPresetsDropdown.contains(e.target) && 
+                !this.presetsList.contains(e.target)) {
+                this.presetsList.classList.remove('show');
+            }
+            if (!this.animationsDropdown.contains(e.target) && 
+                !this.animationsList.contains(e.target)) {
+                this.animationsList.classList.remove('show');
+            }
+        });
+    }
+
+    loadPreset(name, values) {
+        try {
+            console.log('Loading preset:', name, values);
+            
+            // Update vertex positions directly
+            if (this.triangleSystem) {
+                // Update the system's vertices
+                this.triangleSystem.system = {
+                    ...this.triangleSystem.system,
+                    n1: { 
+                        x: parseFloat(values.n1?.x) || 0, 
+                        y: parseFloat(values.n1?.y) || 0 
+                    },
+                    n2: { 
+                        x: parseFloat(values.n2?.x) || 0, 
+                        y: parseFloat(values.n2?.y) || 0 
+                    },
+                    n3: { 
+                        x: parseFloat(values.n3?.x) || 0, 
+                        y: parseFloat(values.n3?.y) || 0 
+                    },
+                    intelligence: { x: 0, y: 0 }  // Reset intelligence point
+                };
+                
+                // Recalculate derived points
+                this.triangleSystem.updateDerivedPoints();
+                
+                // Update display
+                this.triangleSystem.drawSystem();
+                this.triangleSystem.updateDashboard();
+                
+                console.log('Triangle system updated directly');
+            } else {
+                console.error('Triangle system reference not found');
+            }
+
+            // Close the dropdown
+            this.presetsList.classList.remove('show');
+
+            console.log('Preset loaded and applied successfully');
+        } catch (error) {
+            console.error('Error loading preset:', error);
+        }
+    }
+
+    startAnimation(animationType) {
+        console.log('Starting animation:', animationType);
+        // Add animation logic here
+    }
+
+    // Add this method to handle animation playback
+    playAnimation(name, config) {
+        console.log('Playing animation:', name, config);
+        if (this.triangleSystem) {
+            // Populate start values
+            const startNc1Input = document.getElementById('animation-nc1-start');
+            const startNc2Input = document.getElementById('animation-nc2-start');
+            const startNc3Input = document.getElementById('animation-nc3-start');
+
+            if (startNc1Input && startNc2Input && startNc3Input) {
+                startNc1Input.value = config.start.nc1;
+                startNc2Input.value = config.start.nc2;
+                startNc3Input.value = config.start.nc3;
+                console.log('Updated start fields:', config.start);
+            } else {
+                console.error('Some animation start input fields not found');
+            }
+
+            // Populate end values
+            const endNc1Input = document.getElementById('animation-nc1-end');
+            const endNc2Input = document.getElementById('animation-nc2-end');
+            const endNc3Input = document.getElementById('animation-nc3-end');
+
+            if (endNc1Input && endNc2Input && endNc3Input) {
+                endNc1Input.value = config.end.nc1;
+                endNc2Input.value = config.end.nc2;
+                endNc3Input.value = config.end.nc3;
+                console.log('Updated end fields:', config.end);
+            } else {
+                console.error('Some animation end input fields not found');
+            }
+
+            // Optional: Update the current triangle to match start position
+            this.triangleSystem.system = {
+                ...this.triangleSystem.system,
+                nc1: config.start.nc1,
+                nc2: config.start.nc2,
+                nc3: config.start.nc3
+            };
+            this.triangleSystem.drawSystem();
+        }
+    }
+
+    editPreset(name, values) {
+        const newName = prompt('Enter new name for preset:', name);
+        if (newName && newName !== name) {
+            try {
+                // Get current presets
+                const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+                
+                // Delete old name and add with new name
+                delete presets[name];
+                presets[newName] = values;
+                
+                // Save back to storage
+                localStorage.setItem('userPresets', JSON.stringify(presets));
+                
+                // Refresh dropdown
+                this.initializePresetsDropdown();
+                
+                console.log('Preset renamed:', name, 'to', newName);
+            } catch (error) {
+                console.error('Error editing preset:', error);
+                alert('Error editing preset. Please try again.');
+            }
+        }
+    }
+
+    deletePreset(name) {
+        if (confirm(`Are you sure you want to delete the preset "${name}"?`)) {
+            try {
+                // Get current presets
+                const presets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+                
+                // Delete the preset
+                delete presets[name];
+                
+                // Save back to storage
+                localStorage.setItem('userPresets', JSON.stringify(presets));
+                
+                // Refresh dropdown
+                this.initializePresetsDropdown();
+                
+                console.log('Preset deleted:', name);
+            } catch (error) {
+                console.error('Error deleting preset:', error);
+                alert('Error deleting preset. Please try again.');
+            }
+        }
+    }
+}
+
+class ImportManager {
+    constructor(triangleSystem) {
+        this.triangleSystem = triangleSystem;
+        this.initializeImportButton();
+    }
+
+    initializeImportButton() {
+        const importButton = document.getElementById('importButton');
+        const fileInput = document.getElementById('importFile');
+
+        if (!importButton || !fileInput) {
+            console.error('Import button or file input not found');
+            return;
+        }
+
+        // Handle import button click
+        importButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            fileInput.click();
+        });
+
+        // Handle file selection
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                this.importPresets(file);
+                fileInput.value = ''; // Reset file input
+            }
+        });
+    }
+
+    importPresets(file) {
+        console.log('Starting import process for file:', file.name);
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const text = e.target.result;
+                console.log('File contents loaded, first 100 chars:', text.substring(0, 100));
+
+                // Get existing presets first
+                const existingPresets = JSON.parse(localStorage.getItem('userPresets') || '{}');
+                console.log('Existing presets:', Object.keys(existingPresets).length);
+
+                // Parse and process the CSV data
+                const newPresets = this.parseCSVToPresets(text);
+                const newPresetCount = Object.keys(newPresets).length;
+                console.log('New presets created:', newPresetCount);
+
+                if (newPresetCount === 0) {
+                    throw new Error('No valid presets found in file');
+                }
+
+                // Merge presets
+                const mergedPresets = { ...existingPresets, ...newPresets };
+                
+                // Save to localStorage
+                localStorage.setItem('userPresets', JSON.stringify(mergedPresets));
+                console.log('Saved merged presets:', Object.keys(mergedPresets).length);
+
+                // Notify user
+                alert(`Successfully imported ${newPresetCount} presets`);
+
+                // Only update the presets dropdown, not animations
+                if (this.triangleSystem.initializePresets) {
+                    this.triangleSystem.initializePresets();
+                }
+
+            } catch (error) {
+                console.error('Error during import:', error);
+                alert('Error importing presets. Please check the console for details.');
+            }
+        };
+
+        reader.onerror = (error) => {
+            console.error('Error reading file:', error);
+            alert('Error reading file. Please try again.');
+        };
+
+        reader.readAsText(file);
+    }
+
+    parseCSVToPresets(csvText) {
+        const presets = {};
+        
+        // Split into rows and filter out empty ones
+        const rows = csvText.split('\n')
+            .map(row => row.trim())
+            .filter(row => row.length > 0);
+
+        console.log('First few rows:', rows.slice(0, 3));
+
+        // Skip header row
+        for (let i = 1; i < rows.length; i++) {
+            try {
+                const row = rows[i];
+                console.log(`Processing row ${i}:`, row);
+
+                // Split by comma but preserve commas within quotes
+                const columns = this.parseCSVRow(row);
+                console.log('Parsed columns:', columns);
+
+                if (columns.length >= 4) {
+                    const name = columns[0];
+                    // Handle the coordinate pairs which might be in "x,y" format
+                    const n1Coords = this.parseCoordinates(columns[1]);
+                    const n2Coords = this.parseCoordinates(columns[2]);
+                    const n3Coords = this.parseCoordinates(columns[3]);
+
+                    console.log('Parsed coordinates:', {
+                        name,
+                        n1: n1Coords,
+                        n2: n2Coords,
+                        n3: n3Coords
+                    });
+
+                    if (n1Coords && n2Coords && n3Coords) {
+                        presets[name] = {
+                            n1: { x: n1Coords[0], y: n1Coords[1] },
+                            n2: { x: n2Coords[0], y: n2Coords[1] },
+                            n3: { x: n3Coords[0], y: n3Coords[1] },
+                            timestamp: Date.now()
+                        };
+                        console.log('Successfully added preset:', name);
+                    } else {
+                        console.warn(`Invalid coordinates for row ${i}`);
+                    }
+                } else {
+                    console.warn(`Not enough columns in row ${i}:`, columns);
+                }
+            } catch (rowError) {
+                console.error(`Error processing row ${i}:`, rowError);
+            }
+        }
+
+        return presets;
+    }
+
+    parseCSVRow(row) {
+        const result = [];
+        let inQuotes = false;
+        let currentValue = '';
+        
+        for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            
+            if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                result.push(currentValue.trim());
+                currentValue = '';
+            } else {
+                currentValue += char;
+            }
+        }
+        
+        // Push the last value
+        result.push(currentValue.trim());
+        
+        // Clean up quotes
+        return result.map(val => val.replace(/^"|"$/g, '').trim());
+    }
+
+    parseCoordinates(coordString) {
+        try {
+            // Remove any quotes and extra whitespace
+            coordString = coordString.replace(/"/g, '').trim();
+            
+            // Split on comma and parse as floats
+            const [x, y] = coordString.split(',').map(v => {
+                const parsed = parseFloat(v.trim());
+                if (isNaN(parsed)) {
+                    throw new Error(`Invalid coordinate value: ${v}`);
+                }
+                return parsed;
+            });
+
+            return [x, y];
+        } catch (error) {
+            console.warn('Error parsing coordinates:', coordString, error);
+            return null;
+        }
+    }
+}
+
+// Outside the class - DOM initialization
+document.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.querySelector('#canvas');
+    if (canvas) {
+        const triangleSystem = new TriangleSystem(canvas);
+    } else {
+        console.error("Canvas element not found");
+    }
+    
+    // Remove duplicate event listeners that are now in initializeEventListeners
+});
+
+// Helper function to convert number to column letter (including multi-letter columns)
+function getColumnLetter(columnNumber) {
+    let dividend = columnNumber;
+    let columnName = '';
+    let modulo;
+
+    while (dividend > 0) {
+        modulo = (dividend - 1) % 26;
+        columnName = String.fromCharCode(65 + modulo) + columnName;
+        dividend = Math.floor((dividend - modulo) / 26);
+    }
+
+    return columnName;
+}
+
+// Add this at the end of rules-module.js
+class RulesModule {
+    constructor(canvas) {
+        this.triangleSystem = new TriangleSystem(canvas);
+        console.log('RulesModule initialized with triangle system:', this.triangleSystem);
+
+        // Initialize batch tracking
+        this.batchTracking = {
+            processedCount: 0,
+            logInterval: 300,
+            channelUpdates: {
+                NC1: { totalDelta: 0, updates: 0 },
+                NC2: { totalDelta: 0, updates: 0 },
+                NC3: { totalDelta: 0, updates: 0 }
+            },
+            startTime: Date.now(),
+            lastLogTime: Date.now()
+        };
+
+        // Track our own channel values
+        this.channelValues = {
+            NC1: this.triangleSystem.system.nc1,
+            NC2: this.triangleSystem.system.nc2,
+            NC3: this.triangleSystem.system.nc3
+        };
+
+        // Listen for intelligence updates
+        document.addEventListener('intelligence-update', (event) => {
+            console.log('Received intelligence update:', event.detail);
+            const { channel, delta } = event.detail;
+            this.updateChannelLength(channel, delta);
+        });
+    }
+    
+    updateChannelLength(channel, delta) {
+        try {
+            // Get current NC values from the triangle's actual state
+            const currentValues = {
+                nc1: Number(document.getElementById('channel-1').value) || 300,
+                nc2: Number(document.getElementById('channel-2').value) || 300,
+                nc3: Number(document.getElementById('channel-3').value) || 300
+            };
+    
+            console.log('Current channel values:', currentValues);
+    
+            // Update the appropriate channel
+            switch(channel) {
+                case 'NC1':
+                    currentValues.nc1 = Math.max(1, currentValues.nc1 + Number(delta));
+                    break;
+                case 'NC2':
+                    currentValues.nc2 = Math.max(1, currentValues.nc2 + Number(delta));
+                    break;
+                case 'NC3':
+                    currentValues.nc3 = Math.max(1, currentValues.nc3 + Number(delta));
+                    break;
+            }
+    
+            console.log('Updating triangle with new values:', currentValues, 
+                '\nChannel:', channel, 
+                '\nDelta:', delta,
+                '\nChange:', {
+                    from: document.getElementById(this.getChannelInputId(channel)).value,
+                    to: currentValues[channel.toLowerCase()]
+                }
+            );
+    
+            // Use the same method that manual inputs use
+            this.triangleSystem.updateTriangleFromEdges(
+                currentValues.nc1,
+                currentValues.nc2,
+                currentValues.nc3
+            );
+    
+            // Update our tracked values
+            this.channelValues = currentValues;
+    
+        } catch (error) {
+            console.error('Error updating triangle:', error, {
+                channel,
+                delta,
+                currentSystem: this.triangleSystem.system
+            });
+        }
+    }
+
+    logBatchReport(currentValues) {
+        const timeElapsed = (Date.now() - this.batchTracking.lastLogTime) / 1000;
+        
+        console.log('Triangle NC Update Report:', {
+            updatesProcessed: this.batchTracking.processedCount,
+            timeElapsed: `${timeElapsed.toFixed(2)}s`,
+            updatesPerSecond: (this.batchTracking.processedCount / timeElapsed).toFixed(2),
+            channelUpdates: {
+                NC1: {
+                    totalDelta: this.batchTracking.channelUpdates.NC1.totalDelta,
+                    updateCount: this.batchTracking.channelUpdates.NC1.updates,
+                    currentValue: currentValues.nc1
+                },
+                NC2: {
+                    totalDelta: this.batchTracking.channelUpdates.NC2.totalDelta,
+                    updateCount: this.batchTracking.channelUpdates.NC2.updates,
+                    currentValue: currentValues.nc2
+                },
+                NC3: {
+                    totalDelta: this.batchTracking.channelUpdates.NC3.totalDelta,
+                    updateCount: this.batchTracking.channelUpdates.NC3.updates,
+                    currentValue: currentValues.nc3
+                }
+            }
+        });
+    }
+
+    resetBatchTracking() {
+        this.batchTracking.processedCount = 0;
+        this.batchTracking.channelUpdates = {
+            NC1: { totalDelta: 0, updates: 0 },
+            NC2: { totalDelta: 0, updates: 0 },
+            NC3: { totalDelta: 0, updates: 0 }
+        };
+        this.batchTracking.lastLogTime = Date.now();
+    }
+
+    getChannelInputId(channel) {
+        switch(channel) {
+            case 'NC1': return 'channel-1';
+            case 'NC2': return 'channel-2';
+            case 'NC3': return 'channel-3';
+            default: return null;
+        }
+    }
+}
 
 

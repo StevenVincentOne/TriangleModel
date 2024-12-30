@@ -23,6 +23,24 @@ export class CapacityModule {
         if (initialMetrics) {
             this.updateUtilizationPercentages(initialMetrics);
         }
+
+        // Add event listener for EB percent changes
+        const ebPercentInput = document.getElementById('eb-percent');
+        const enPercentInput = document.getElementById('en-percent');
+        
+        if (ebPercentInput && enPercentInput) {
+            ebPercentInput.addEventListener('input', () => {
+                const ebPercent = parseInt(ebPercentInput.value) || 0;
+                enPercentInput.value = 100 - ebPercent;
+                this.updateBitsNoiseDistribution();
+            });
+
+            enPercentInput.addEventListener('input', () => {
+                const enPercent = parseInt(enPercentInput.value) || 0;
+                ebPercentInput.value = 100 - enPercent;
+                this.updateBitsNoiseDistribution();
+            });
+        }
     }
 
     async init() {
@@ -62,11 +80,11 @@ export class CapacityModule {
             const edValue = parseFloat(edInput.value) || 0;
             const ebPercent = parseInt(ebPercentInput.value) || 0;
             
-            const ebValue = edValue * (ebPercent / 100);
-            const enValue = edValue * ((100 - ebPercent) / 100);
+            const ebValue = Math.round(edValue * (ebPercent / 100));
+            const enValue = Math.round(edValue * ((100 - ebPercent) / 100));
             
-            ebInput.value = ebValue.toFixed(2);
-            enInput.value = enValue.toFixed(2);
+            ebInput.value = ebValue;
+            enInput.value = enValue;
         }
     }
 

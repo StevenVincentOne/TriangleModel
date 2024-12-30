@@ -150,43 +150,8 @@
 }
 
 .data-controls-section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    width: fit-content;
-    margin-left: auto;
-}
-
-.data-controls-section button {
-    width: 120px;
-    text-align: center;
-    background-color: #0d4429 !important; /* Dark green for OFF state */
-    border-color: #0d4429 !important;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    border-radius: 0.25rem;
-    border: 1px solid transparent;
-    transition: background-color 0.15s ease-in-out;
-}
-
-/* Active/ON state */
-.data-controls-section button.active,
-#letterFlowToggle.active,
-#intelligenceToggle.active {
-    background-color: #198754 !important; /* Brighter green for ON state */
-    border-color: #198754 !important;
-}
-
-/* Hover state */
-.data-controls-section button:hover {
-    background-color: #145c3a !important; /* Medium green for hover */
-    border-color: #145c3a !important;
-}
-
-/* Remove margin from last button */
-.data-controls-section button:last-child {
-    margin-bottom: 0;
+    padding: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* Keep original button styling */
@@ -601,7 +566,6 @@
         .btn-secondary:active,
         .btn-secondary.active {
             width: auto !important;
-            min-width: -webkit-fill-available;
             min-width: fit-content;
             height: auto !important;
         }
@@ -2060,120 +2024,115 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     color: #fff !important;
 }
 
-/* System Intelligence Inputs styling */
+/* System Intelligence inputs in animation panel */
 .system-intelligence-inputs {
-    font-size: 0.85rem;  /* Smaller font size */
     display: flex;
     flex-direction: column;
-    gap: 2px;  /* Minimal gap between rows */
-    align-items: flex-end;  /* Right justify the content */
+    gap: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    align-items: center;  /* Center the rows */
 }
 
 .system-intelligence-inputs .input-row {
     display: flex;
     align-items: center;
-    gap: 4px;  /* Small gap between label and input */
-    width: fit-content;  /* Only as wide as needed */
+    justify-content: center;  /* Center the content */
+    gap: 0.5rem;
+    width: 100%;  /* Full width for proper centering */
 }
 
 .system-intelligence-inputs label {
-    margin: 0;  /* Remove default margins */
-    white-space: nowrap;  /* Prevent label wrapping */
+    min-width: 5.5ch;  /* Slightly wider to accommodate "Entropy:" */
+    color: #fff;  /* Brighter color to match other labels */
+    font-size: 0.8rem;
+    text-align: right;  /* Align labels to the right */
 }
 
 .system-intelligence-inputs input {
-    width: 50px;  /* Consistent width for number inputs */
-    height: 22px;  /* Smaller height */
-    padding: 2px 4px;  /* Minimal padding */
-    font-size: 0.85rem;  /* Match parent font size */
+    width: 8ch !important;
+    min-width: 8ch !important;
+    padding: 0.15rem 0.25rem !important;
+    font-size: 0.8rem !important;
+    text-align: center !important;
+    height: auto !important;
+    background-color: #1e1e1e !important;  /* Match the animation input background */
+    color: #fff !important;
+    border: 1px solid #3a3a3a !important;  /* Match the animation input border */
+    border-radius: 4px !important;
 }
 
-/* For readonly inputs (metrics) */
-.system-intelligence-inputs input[readonly] {
-    background-color: #2b2b2b;  /* Darker background for readonly fields */
-    border: 1px solid #444;
-    color: #fff;
+/* Add specific styling for the loss input field */
+#loss-input-factor {
+    width: 8ch !important;
+    min-width: 8ch !important;
+    padding: 0.15rem 0.25rem !important;
+    font-size: 0.8rem !important;
+    text-align: center !important;
+    height: auto !important;
+    background-color: #1e1e1e !important;
+    color: #fff !important;
+    border: 1px solid #3a3a3a !important;
+    border-radius: 4px !important;
 }
 
-/* For number inputs */
-.system-intelligence-inputs input[type="number"] {
-    background-color: #333;  /* Slightly lighter background for editable fields */
-    border: 1px solid #444;
-    color: #fff;
-}
-
-.intelligence-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    width: fit-content;
-    margin-left: auto;
-}
-
-.intelligence-controls button {
-    width: 120px;
-    text-align: center;
-    background-color: #0d4429 !important; /* Dark green for OFF state */
-    border-color: #0d4429 !important;
-    color: white;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-    border-radius: 0.25rem;
-    border: 1px solid transparent;
-    transition: background-color 0.15s ease-in-out;
-}
-
-/* Active/ON state */
-.intelligence-controls button.active,
-#letterFlowToggle.active,
-#intelligenceToggle.active {
-    background-color: #198754 !important; /* Brighter green for ON state */
+#loss-input-factor:focus {
+    outline: none !important;
     border-color: #198754 !important;
+    box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25) !important;
+}
+
+/* Ensure input doesn't maintain focus styling after blur */
+#loss-input-factor:not(:focus) {
+    border-color: #3a3a3a !important;
+    box-shadow: none !important;
+}
+
+/* Intelligence button */
+
+
+
+/* Intelligence Toggle Button Styles - Base state */
+#intelligenceToggle {
+    width: 14ch !important;
+    text-align: center !important;
+    margin-bottom: 0.5rem !important;
+    padding: 0.375rem 0.75rem !important;
+    border-radius: 4px !important;
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+    color: #fff !important;
+    transition: background-color 0.15s ease-in-out !important;
 }
 
 /* Hover state */
-.intelligence-controls button:hover {
-    background-color: #145c3a !important; /* Medium green for hover */
-    border-color: #145c3a !important;
+#intelligenceToggle:hover {
+    background-color: #157347 !important;
+    border-color: #146c43 !important;
 }
 
-/* Add these new styles */
-@keyframes flash-success {
-    0% { background-color: #0d4429 !important; }
-    50% { background-color: #198754 !important; }
-    100% { background-color: #0d4429 !important; }
+/* Status Icons */
+#intelligenceToggle .status-icon-off,
+#intelligenceToggle .status-icon-on {
+    margin-left: 5px;
 }
 
-/* Specific buttons that should flash */
-#initializeSystem.flash,
-#zeroDataButton.flash {
-    animation: flash-success 1s ease-in-out !important;
+/* Default state (off) - Red X */
+#intelligenceToggle .status-icon-off {
+    display: inline;
+    color: #dc3545;  /* Red X */
 }
 
-/* Add to your existing CSS */
-.form-control[type="number"] {
-    text-align: center;
+#intelligenceToggle .status-icon-on {
+    display: none;
 }
 
-/* If you need to override any existing styles, you can make it more specific */
-.processing-panel .form-control[type="number"] {
-    text-align: center;
+/* Active state (on) - Green checkmark */
+#intelligenceToggle.active .status-icon-off {
+    display: none;
 }
 
-/* Add to your existing CSS */
-.input-row input[type="text"],
-.input-row input[type="number"] {
-    text-align: center;
-}
-
-/* Remove spinner buttons from number inputs if desired */
-.input-row input[type="number"]::-webkit-inner-spin-button,
-.input-row input[type="number"]::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-/* Firefox */
-.input-row input[type="number"] {
-    -moz-appearance: textfield;
+#intelligenceToggle.active .status-icon-on {
+    display: inline;
+    color: #28a745;  /* Green checkmark */
 }

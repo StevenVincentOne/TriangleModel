@@ -602,7 +602,7 @@ export class PresetManager {
         // Try both possible button IDs
         const savePresetButton = document.getElementById('save-preset') || document.getElementById('savePreset');
         if (savePresetButton) {
-            console.log('Found save preset button');
+            
             // Remove any existing listeners
             const newButton = savePresetButton.cloneNode(true);
             savePresetButton.parentNode.replaceChild(newButton, savePresetButton);

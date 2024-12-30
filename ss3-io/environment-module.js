@@ -1,11 +1,14 @@
 import { LossFunction } from '../ss2-processing/data-processing.js';
 import { CircleMetrics } from './circle-metrics.js';
 import { CapacityModule } from './capacity-module.js';
+import { EnvironmentDatabase } from '../shared/ui/database.js';
 
 export class EnvironmentModule {
-    constructor(intelligenceModule, triangleSystem) {
+    constructor(intelligenceModule, triangleSystem, environmentDB) {
+        console.log('Initializing EnvironmentModule');
         this.intelligenceModule = intelligenceModule;
         this.triangleSystem = triangleSystem;
+        this.environmentDB = environmentDB;
         this.lossFunction = new LossFunction();
         this.isGenerating = false;
         this.generationInterval = null;
@@ -31,13 +34,14 @@ export class EnvironmentModule {
             }
         };
 
-        this.environmentalData = new EnvironmentalData();
+        this.environmentDB = new EnvironmentDatabase();
+        this.environmentData = new EnvironmentalData(this.environmentDB);
+
         this.dashboardElements = {};
         this.initializeDashboardElements();
         this.initializeControls();
         
-        // Initialize environmental data right after setup
-        this.initializeEnvironmentalData(true);
+        
         
         // Remove the initialize button handler from here since it's handled in index.js
         
@@ -93,6 +97,27 @@ export class EnvironmentModule {
         }
 
         this.circleMetrics = new CircleMetrics(triangleSystem);
+
+        // Add monitoring interval
+        this.monitoringInterval = null;
+        
+        this.startStoreMonitoring();
+
+        // Add cache for previous values and batch tracking
+        this.previousValues = {
+            ed: null,
+            eb: null,
+            en: null
+        };
+        this.batchTracking = {
+            changeCount: 0,
+            lastLogTime: Date.now(),
+            BATCH_THRESHOLD: 300,  // Log after 300 symbol changes
+            MIN_LOG_INTERVAL: 5000 // Minimum 5 seconds between logs
+        };
+
+        // Start monitoring but don't initialize data
+        this.startEnvironmentMonitoring();
     }
 
     initializeControls() {
@@ -104,19 +129,7 @@ export class EnvironmentModule {
             rateValue: rateValue ? 'yes' : 'no'
         });
 
-        if (toggleBtn) {
-            toggleBtn.addEventListener('click', () => {
-                if (this.isGenerating) {
-                    this.stopLetterGeneration();
-                    toggleBtn.textContent = 'Start Flow';
-                    toggleBtn.classList.remove('active');
-                } else {
-                    this.startLetterGeneration();
-                    toggleBtn.textContent = 'Stop Flow';
-                    toggleBtn.classList.add('active');
-                }
-            });
-        }
+        
 
         // Add handlers for the flow rate input
         if (rateValue) {
@@ -283,57 +296,28 @@ export class EnvironmentModule {
         };
     }
 
-    initializeEnvironmentalData(resetToZero = false) {
-        console.log('Initializing environmental data, resetToZero:', resetToZero);
-        
-        const metrics = this.triangleSystem?.circleMetrics?.calculateExternalRegions();
-        if (!metrics) {
-            console.warn('No metrics available for initialization');
-            return;
+    async initializeEnvironmentalData(resetToZero = false) {
+        try {
+            console.log('Waiting for database to be ready...');
+            // Wait for database to be ready
+            await this.environmentDB.ready;
+            console.log('Database is ready, proceeding with initialization');
+
+            // Clear existing data first
+            const initialData = {
+                bits: Array(13825).fill({ type: 'bit' }),
+                noise: Array(13825).fill({ type: 'noise' }),
+                timestamp: Date.now()
+            };
+            
+            await this.environmentDB.storeEnvironmentalPool(initialData);
+            console.log('Stored new environmental data');
+            
+            // Update the display
+            await this.updateEnvironmentDisplay();
+        } catch (error) {
+            console.error('Error in initializeEnvironmentalData:', error);
         }
-
-        if (resetToZero) {
-            console.log('Resetting all values to zero');
-            this.environmentalData.environmentalData = 0;
-            this.environmentalData.cc1Data = 0;
-            this.environmentalData.cc2Data = 0;
-            this.environmentalData.cc3Data = 0;
-        } else {
-            console.log('Generating new random values');
-            // Generate random utilization (50-90%)
-            const ccuPercent = Math.random() * 40 + 50;
-            const cc = metrics.totalExternal;
-            
-            console.log('Generated values:', {
-                ccuPercent,
-                totalExternal: cc
-            });
-
-            this.environmentalData.environmentalData = cc * (ccuPercent / 100);
-            
-            // Initialize CC1-3 data with random utilization (50-90%)
-            this.environmentalData.cc1Data = metrics.cc1 * (Math.random() * 40 + 50) / 100;
-            this.environmentalData.cc2Data = metrics.cc2 * (Math.random() * 40 + 50) / 100;
-            this.environmentalData.cc3Data = metrics.cc3 * (Math.random() * 40 + 50) / 100;
-            
-            // Generate random B/N ratio (30-70% bits)
-            const bitsRatio = Math.random() * 40 + 30;
-            const totalBits = this.environmentalData.environmentalData * (bitsRatio / 100);
-            const totalNoise = this.environmentalData.environmentalData * ((100 - bitsRatio) / 100);
-            
-            this.environmentalData.setDirectly(totalBits, totalNoise);
-
-            console.log('Environmental data initialized:', {
-                environmentalData: this.environmentalData.environmentalData,
-                bits: this.environmentalData.environmentalBits,
-                noise: this.environmentalData.environmentalNoise,
-                cc1: this.environmentalData.cc1Data,
-                cc2: this.environmentalData.cc2Data,
-                cc3: this.environmentalData.cc3Data
-            });
-        }
-        
-        this.updateDashboard();
     }
 
     updateDashboard() {
@@ -505,10 +489,156 @@ export class EnvironmentModule {
             });
         }
     }
+
+    async clearExistingData() {
+        try {
+            console.log('clearExistingData: Starting to clear existing data...');
+            await this.environmentDB.ready;
+            console.log('clearExistingData: EnvironmentDB is ready');
+
+            console.log('clearExistingData: Clearing "environmental" store...');
+            await this.environmentDB.clearStore('environmental');
+            console.log('clearExistingData: "environmental" store cleared');
+
+            console.log('clearExistingData: Clearing "processing" store...');
+            await this.environmentDB.clearStore('processing');
+            console.log('clearExistingData: "processing" store cleared');
+
+            console.log('clearExistingData: Resetting in-memory environmental data');
+            this.resetEnvironmentalData();
+
+            console.log('clearExistingData: All stores cleared successfully');
+            return true;
+        } catch (error) {
+            console.error('clearExistingData: Error clearing stores:', error);
+            throw error;
+        }
+    }
+
+    resetEnvironmentalData() {
+        // Implement any in-memory data reset logic if needed
+        console.log('resetEnvironmentalData: In-memory environmental data reset');
+    }
+
+    async handlingInitialization(state) {
+        console.log('handleInitialization: Starting environment initialization...');
+        try {
+            console.log('handleInitialization: Clearing existing data...');
+            const cleared = await this.clearExistingData();
+            if (!cleared) {
+                throw new Error('handleInitialization: Failed to clear existing data');
+            }
+            console.log('handleInitialization: Existing data cleared successfully');
+
+            console.log('handleInitialization: Generating new environmental data...');
+            await this.environmentData.generateNewData(state);
+            console.log('handleInitialization: New environmental data generated');
+
+            console.log('handleInitialization: Initialization complete');
+            return true;
+        } catch (error) {
+            console.error('handleInitialization: Error during environment initialization:', error);
+            throw error;
+        }
+    }
+
+    async updateEnvironmentDisplay() {
+        try {
+            // Get all symbols from environment store
+            const environmentalData = await this.environmentDB.getEnvironmentalPool();
+            const currentData = environmentalData[0];
+            
+            if (!currentData) {
+                
+                return;
+            }
+
+            // Calculate totals from arrays
+            const totalBits = currentData.bits?.length || 0;
+            const totalNoise = currentData.noise?.length || 0;
+            const totalData = totalBits + totalNoise;
+
+            // Check if values have changed before updating
+            const edInput = document.getElementById('system-ed');
+            const ebInput = document.getElementById('system-eb');
+            const enInput = document.getElementById('system-en');
+
+            const hasChanged = 
+                edInput && parseFloat(edInput.value) !== totalData ||
+                ebInput && parseFloat(ebInput.value) !== totalBits ||
+                enInput && parseFloat(enInput.value) !== totalNoise;
+
+            // Only update and log if values have changed
+            if (hasChanged) {
+                if (edInput) edInput.value = totalData.toFixed(2);
+                if (ebInput) ebInput.value = totalBits.toFixed(2);
+                if (enInput) enInput.value = totalNoise.toFixed(2);
+
+                console.log('Environmental Data values updated:', {
+                    totalData,
+                    totalBits,
+                    totalNoise
+                });
+            }
+        } catch (error) {
+            console.error('Error updating environment display:', error);
+        }
+    }
+
+    async startStoreMonitoring() {
+        console.log('Starting environment store monitoring');
+        
+        // Initial update
+        await this.updateEnvironmentDisplay();
+
+        // Set up periodic monitoring
+        this.monitoringInterval = setInterval(async () => {
+            await this.updateEnvironmentDisplay();
+        }, 1000); // Update every second
+    }
+
+    stopStoreMonitoring() {
+        if (this.monitoringInterval) {
+            clearInterval(this.monitoringInterval);
+            this.monitoringInterval = null;
+            console.log('Environment store monitoring stopped');
+        }
+    }
+
+    // Add cleanup method
+    cleanup() {
+        this.stopStoreMonitoring();
+        // ... any other cleanup needed
+    }
+
+    // Make sure this is called when component is destroyed/unmounted
+    destroy() {
+        this.cleanup();
+    }
+
+    startEnvironmentMonitoring() {
+        // Clear any existing interval
+        if (this.monitorInterval) {
+            clearInterval(this.monitorInterval);
+        }
+        
+        // Update immediately
+        this.updateEnvironmentDisplay();
+        
+        // Listen for ALL store changes
+        window.addEventListener('storeChanged', async (event) => {
+            if (event.detail.store === 'environment') {
+                console.log('Environment store changed:', event.detail.action);
+                // Always update display when environment store changes
+                await this.updateEnvironmentDisplay();
+            }
+        });
+    }
 }
 
 class EnvironmentalData {
-    constructor() {
+    constructor(environmentDB) {
+        this.environmentDB = environmentDB;
         this._environmentalData = 0;  // ED
         this._environmentalBits = 0;   // EB
         this._environmentalNoise = 0;  // EN
@@ -555,6 +685,25 @@ class EnvironmentalData {
         this._environmentalBits = Math.max(0, bits);
         this._environmentalNoise = Math.max(0, noise);
         this._environmentalData = this._environmentalBits + this._environmentalNoise;
+    }
+
+    decrementBits() {
+        if (this._environmentalBits > 0) {
+            this._environmentalBits = Math.max(0, this._environmentalBits - 1);
+            this.recalculateED();
+        }
+    }
+
+    decrementNoise() {
+        if (this._environmentalNoise > 0) {
+            this._environmentalNoise = Math.max(0, this._environmentalNoise - 1);
+            this.recalculateED();
+        }
+    }
+
+    incrementNoise() {
+        this._environmentalNoise++;
+        this.recalculateED();
     }
 }
 

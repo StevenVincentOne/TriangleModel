@@ -177,14 +177,29 @@ export class DataProcessing {
     constructor(environmentModule) {
         console.log('DataProcessing constructor called');
         this.environmentModule = environmentModule;
-        this.environmentDB = environmentDB;
-        console.log('Using shared database instance in DataProcessing');
+        this.environmentDB = environmentModule.environmentDB;
+        
+        this.isProcessing = false;
+        this.flowInterval = null;
         this.flowRate = 10;
         this.pbPercent = 50;
-        this.isProcessing = false;
         
-        // Wait for database to be ready
-        this.ready = this.init();
+        // Add cache for previous values and batch tracking
+        this.previousValues = {
+            pd: null,
+            pb: null,
+            pn: null
+        };
+        
+        this.batchTracking = {
+            processedCount: 0,
+            lastLogTime: Date.now(),
+            BATCH_THRESHOLD: 300,
+            MIN_LOG_INTERVAL: 5000 // Minimum 5 seconds between logs
+        };
+        
+        this.setupControls();
+        this.startProcessPoolMonitoring();
     }
 
     async init() {
@@ -213,43 +228,32 @@ export class DataProcessing {
         const processButton = document.getElementById('processDataButton');
         console.log('Process button element:', processButton);
         
-        processButton?.addEventListener('click', (e) => {
-            console.log('Process button clicked');
-            if (this.isProcessing) {
-                console.log('Stopping processing');
-                this.stopProcessing();
-                e.target.classList.remove('active');
-            } else {
-                console.log('Starting processing');
-                this.startProcessing();
-                e.target.classList.add('active');
-            }
-        });
+        if (processButton) {
+            // Remove any existing listeners first
+            processButton.removeEventListener('click', this.processButtonClick);
+            // Add new listener with bound context
+            processButton.addEventListener('click', () => this.processButtonClick());
+        }
 
         // Flow rate control
-        document.getElementById('flow-rate')?.addEventListener('input', (e) => {
-            this.flowRate = parseInt(e.target.value) || 0;
-        });
+        const flowRateInput = document.getElementById('flow-rate');
+        if (flowRateInput) {
+            flowRateInput.addEventListener('input', (e) => {
+                this.flowRate = parseInt(e.target.value) || 0;
+            });
+        }
 
         // PB percentage control
-        document.getElementById('pb-flow-rate')?.addEventListener('input', (e) => {
-            this.pbPercent = parseInt(e.target.value) || 0;
-            const pnInput = document.getElementById('pn-flow-rate');
-            if (pnInput) {
-                pnInput.value = 100 - this.pbPercent;
-            }
-        });
-
-        // Data Flow button
-        document.getElementById('letterFlowToggle')?.addEventListener('click', (e) => {
-            if (this.isProcessing) {
-                this.stopDataFlow();
-                e.target.classList.remove('active');
-            } else {
-                this.startDataFlow();
-                e.target.classList.add('active');
-            }
-        });
+        const pbFlowRate = document.getElementById('pb-flow-rate');
+        if (pbFlowRate) {
+            pbFlowRate.addEventListener('input', (e) => {
+                this.pbPercent = parseInt(e.target.value) || 0;
+                const pnInput = document.getElementById('pn-flow-rate');
+                if (pnInput) {
+                    pnInput.value = Math.round(100 - this.pbPercent);
+                }
+            });
+        }
     }
 
     async startDataFlow() {
@@ -257,46 +261,59 @@ export class DataProcessing {
         this.isProcessing = true;
         
         this.flowInterval = setInterval(async () => {
-            const envData = await this.environmentModule.environmentDB.getEnvironmentalPool();
-            if (!envData || (!envData.bits.length && !envData.noise.length)) {
-                console.log('No environmental data available');
-                return;
-            }
-
-            // Calculate symbols to process based on flow rate
-            const symbolsToProcess = Math.min(this.flowRate, envData.bits.length + envData.noise.length);
-            
-            for (let i = 0; i < symbolsToProcess; i++) {
-                // Determine whether to process as bit or noise based on PB percentage
-                const processingAsBit = Math.random() * 100 < this.pbPercent;
-                let symbol;
-
-                if (processingAsBit && envData.bits.length > 0) {
-                    symbol = envData.bits.shift();
-                    this.processingPool.processBits++;
-                } else if (!processingAsBit && envData.noise.length > 0) {
-                    symbol = envData.noise.shift();
-                    this.processingPool.processNoise++;
-                } else {
-                    continue; // Skip if desired type is empty
+            try {
+                const envData = await this.environmentModule.environmentDB.getEnvironmentalPool();
+                if (!envData || (!envData.bits.length && !envData.noise.length)) {
+                    console.log('No environmental data available');
+                    return;
                 }
 
-                this.processingPool.totalData++;
+                // Calculate symbols to process based on flow rate
+                const symbolsToProcess = Math.min(this.flowRate, envData.bits.length + envData.noise.length);
+                
+                for (let i = 0; i < symbolsToProcess; i++) {
+                    const processingAsBit = Math.random() * 100 < this.pbPercent;
+                    let symbol;
 
-                // Store in processing pool database
-                await this.processingPoolDB.storeSymbol({
-                    symbol,
-                    timestamp: Date.now(),
-                    type: processingAsBit ? 'bit' : 'noise'
-                });
+                    if (processingAsBit && envData.bits.length > 0) {
+                        symbol = envData.bits.shift();
+                        this.processingPool.processBits++;
+                    } else if (!processingAsBit && envData.noise.length > 0) {
+                        symbol = envData.noise.shift();
+                        this.processingPool.processNoise++;
+                    } else {
+                        continue;
+                    }
+
+                    this.processingPool.totalData++;
+
+                    // Skip storing if processingPoolDB is not available
+                    if (!this.processingPoolDB) {
+                        console.log('Processing Pool DB not available - continuing without storage');
+                        continue;
+                    }
+
+                    try {
+                        await this.processingPoolDB.storeSymbol({
+                            symbol,
+                            timestamp: Date.now(),
+                            type: processingAsBit ? 'bit' : 'noise'
+                        });
+                    } catch (error) {
+                        console.log('Unable to store symbol - continuing without storage');
+                        continue;
+                    }
+                }
+
+                // Update environmental database
+                await this.environmentModule.environmentDB.storeEnvironmentalPool(envData);
+                
+                // Update displays
+                this.updateDashboard();
+            } catch (error) {
+                console.error('Error in data flow:', error);
             }
-
-            // Update environmental database
-            await this.environmentModule.environmentDB.storeEnvironmentalPool(envData);
-            
-            // Update displays
-            this.updateDashboard();
-        }, 1000); // Run every second
+        }, 1000);
     }
 
     stopDataFlow() {
@@ -318,79 +335,359 @@ export class DataProcessing {
 
     async startProcessing() {
         console.log('startProcessing called');
-        if (this.isProcessing) {
-            console.log('Already processing, returning');
+        if (!this.environmentDB) {
+            console.error('No database connection available');
             return;
         }
-        
-        this.isProcessing = true;
-        console.log('Setting up process interval');
-        
-        this.processInterval = setInterval(async () => {
-            try {
-                console.log('Process interval tick');
-                const envData = await this.environmentDB.getEnvironmentalPool();
-                console.log('Retrieved environmental data:', {
-                    bitsLength: envData?.bits?.length || 0,
-                    noiseLength: envData?.noise?.length || 0,
-                    sampleBits: envData?.bits?.slice(0, 5),
-                    sampleNoise: envData?.noise?.slice(0, 5)
-                });
 
-                if (!envData || (!envData.bits?.length && !envData.noise?.length)) {
-                    console.log('No environmental data available');
-                    return;
-                }
+        try {
+            console.log('Setting up process interval');
+            this.processInterval = setInterval(async () => {
+                try {
+                    // Get data from environmental pool
+                    const envData = await this.environmentDB.getEnvironmentalPool();
+                    console.log('Retrieved environmental data:', envData);
 
-                // Process symbols based on flow rate
-                const symbolsToProcess = Math.min(this.flowRate, envData.bits.length + envData.noise.length);
-                
-                for (let i = 0; i < symbolsToProcess; i++) {
-                    const processingAsBit = Math.random() * 100 < this.pbPercent;
-                    let symbol;
-
-                    if (processingAsBit && envData.bits.length > 0) {
-                        symbol = envData.bits.shift();
-                        this.processingPool.processBits++;
-                    } else if (!processingAsBit && envData.noise.length > 0) {
-                        symbol = envData.noise.shift();
-                        this.processingPool.processNoise++;
-                    } else {
-                        continue;
+                    if (!envData || envData.length === 0) {
+                        console.log('No environmental data available');
+                        return;
                     }
 
-                    this.processingPool.totalData++;
-
-                    // Store the processed symbol
-                    await this.environmentDB.storeProcessedSymbol({
-                        symbol,
-                        type: processingAsBit ? 'bit' : 'noise'
-                    });
-                }
-
-                // Update environmental pool
-                await this.environmentDB.storeEnvironmentalPool(envData);
-                
-                // Update displays
-                this.updateDashboard();
-
-                console.log('Processing Pool State:', {
-                    total: this.processingPool.totalData,
-                    bits: this.processingPool.processBits,
-                    noise: this.processingPool.processNoise,
-                    remainingEnv: {
-                        bits: envData.bits.length,
-                        noise: envData.noise.length
+                    // Process the array of symbols
+                    for (const symbol of envData) {
+                        // Process each symbol
+                        await this.processSymbol(symbol);
                     }
-                });
-            } catch (error) {
-                console.error('Error in processing:', error);
+
+                } catch (error) {
+                    console.error('Error in processing cycle:', error);
+                }
+            }, 1000);
+
+        } catch (error) {
+            console.error('Error starting processing:', error);
+        }
+    }
+
+    async processNextSymbol(envData) {
+        try {
+            // Determine whether to process bit or noise based on percentages
+            const processBit = Math.random() * 100 < this.pbPercent;
+            
+            if (processBit && envData.bits && envData.bits.length > 0) {
+                const symbol = envData.bits.shift();
+                // Update bitsLength
+                if (envData.bitsLength !== undefined) {
+                    envData.bitsLength = envData.bits.length;
+                }
+                return {
+                    symbol,
+                    type: 'bit',
+                    timestamp: Date.now()
+                };
+            } else if (!processBit && envData.noise && envData.noise.length > 0) {
+                const symbol = envData.noise.shift();
+                // Update noiseLength
+                if (envData.noiseLength !== undefined) {
+                    envData.noiseLength = envData.noise.length;
+                }
+                return {
+                    symbol,
+                    type: 'noise',
+                    timestamp: Date.now()
+                };
             }
-        }, 1000);
+            
+            return null;
+        } catch (error) {
+            console.error('Error processing symbol:', error);
+            return null;
+        }
+    }
+
+    // Update process control methods
+    async processButtonClick() {
+        console.log('Process button clicked');
+        if (this.isProcessing) {
+            console.log('Stopping processing');
+            this.stopProcessing();
+            // Update button state
+            const processButton = document.getElementById('processDataButton');
+            if (processButton) {
+                processButton.classList.remove('active');
+            }
+        } else {
+            console.log('Starting processing');
+            this.isProcessing = true;
+            await this.startProcessing();
+            // Update button state
+            const processButton = document.getElementById('processDataButton');
+            if (processButton) {
+                processButton.classList.add('active');
+            }
+        }
     }
 
     stopProcessing() {
+        console.log('Stopping processing...');
+        if (this.processInterval) {
+            clearInterval(this.processInterval);
+            this.processInterval = null;
+        }
         this.isProcessing = false;
-        clearInterval(this.processInterval);
+        console.log('Processing stopped');
+    }
+
+    async processData() {
+        try {
+            const envData = await this.environmentModule.environmentDB.getEnvironmentalPool();
+            if (!envData) return;
+
+            const symbolsToProcess = Math.min(this.flowRate, envData.bits.length + envData.noise.length);
+            
+            for (let i = 0; i < symbolsToProcess; i++) {
+                const processingAsBit = Math.random() * 100 < this.pbPercent;
+                let symbol;
+                let symbolType;
+
+                if (processingAsBit && envData.bits.length > 0) {
+                    symbol = envData.bits.shift();
+                    
+                    if (Math.random() * 100 < this.pbLossRate) {
+                        symbolType = 'noise';
+                        this.processingPool.processNoise++;
+                        this.batchStats.processedNoise++;
+                        this.batchStats.lostBits++;
+                        this.environmentModule.environmentalData.decrementBits();
+                        this.environmentModule.environmentalData.incrementNoise();
+                    } else {
+                        symbolType = 'bit';
+                        this.processingPool.processBits++;
+                        this.batchStats.processedBits++;
+                        this.environmentModule.environmentalData.decrementBits();
+                    }
+                } else if (!processingAsBit && envData.noise.length > 0) {
+                    symbol = envData.noise.shift();
+                    symbolType = 'noise';
+                    this.processingPool.processNoise++;
+                    this.batchStats.processedNoise++;
+                    this.environmentModule.environmentalData.decrementNoise();
+                } else {
+                    continue;
+                }
+
+                this.processedCount++;
+                this.processingPool.totalData++;
+
+                // Store in processing pool
+                await this.processingPoolDB.storeSymbol({
+                    symbol,
+                    timestamp: Date.now(),
+                    type: symbolType
+                });
+
+                // Log batch stats every 300 symbols
+                if (this.processedCount % this.batchSize === 0) {
+                    console.log(`Processing Batch Report (${this.batchSize} symbols):`, {
+                        processedBits: this.batchStats.processedBits,
+                        processedNoise: this.batchStats.processedNoise,
+                        lostBits: this.batchStats.lostBits,
+                        totalProcessed: this.processedCount,
+                        remainingBits: envData.bits.length,
+                        remainingNoise: envData.noise.length
+                    });
+                    
+                    // Reset batch stats
+                    this.batchStats = {
+                        processedBits: 0,
+                        processedNoise: 0,
+                        lostBits: 0
+                    };
+                }
+            }
+
+            // Update environmental database
+            await this.environmentModule.environmentDB.storeEnvironmentalPool(envData);
+            
+            // Update both dashboards
+            this.updateDashboard();
+            this.environmentModule.updateDashboard();
+
+        } catch (error) {
+            console.error('Error in processData:', error);
+        }
+    }
+
+    resetProcessingPool() {
+        this.processingPool = {
+            totalData: 0,
+            processBits: 0,
+            processNoise: 0
+        };
+        this.totalProcessedCount = 0;
+        this.batchStats = this.createEmptyBatchStats();
+        console.log('Processing pool reset');
+    }
+
+    // Add this method to be called during initialization
+    async handleInitialization() {
+        try {
+            // Stop any ongoing processing
+            if (this.isProcessing) {
+                this.stopProcessing();
+            }
+            
+            // Reset all processing-related data
+            this.resetProcessingPool();
+            
+            console.log('DataProcessing initialization complete');
+        } catch (error) {
+            console.error('Error during DataProcessing initialization:', error);
+        }
+    }
+
+    async startProcessPoolMonitoring() {
+        console.log('Starting process pool monitoring');
+        
+        // Initial update
+        await this.updateProcessPoolDisplay();
+
+        // Set up periodic monitoring
+        this.monitoringInterval = setInterval(async () => {
+            await this.updateProcessPoolDisplay();
+        }, 5000); // Update every 5 seconds
+    }
+
+    async updateProcessPoolDisplay() {
+        try {
+            if (!this.environmentDB) {
+                return;
+            }
+            
+            const processedSymbols = await this.environmentDB.getProcessedSymbols();
+            
+            if (!processedSymbols || processedSymbols.length === 0) {
+                if (this.previousValues.pd !== 0) {
+                    const pdInput = document.getElementById('process-d');
+                    const pbInput = document.getElementById('process-b');
+                    const pnInput = document.getElementById('process-n');
+
+                    if (pdInput) pdInput.value = '0.00';
+                    if (pbInput) pbInput.value = '0.00';
+                    if (pnInput) pnInput.value = '0.00';
+                    
+                    this.previousValues = { pd: 0, pb: 0, pn: 0 };
+                }
+                return;
+            }
+
+            // Count bits and noise
+            const counts = processedSymbols.reduce((acc, symbol) => {
+                if (symbol.type === 'bit') {
+                    acc.bits++;
+                } else if (symbol.type === 'noise') {
+                    acc.noise++;
+                }
+                return acc;
+            }, { bits: 0, noise: 0 });
+
+            const totalData = counts.bits + counts.noise;
+
+            // Check if values have changed
+            const hasChanged = 
+                this.previousValues.pd !== totalData ||
+                this.previousValues.pb !== counts.bits ||
+                this.previousValues.pn !== counts.noise;
+
+            if (hasChanged) {
+                // Update displays
+                const pdInput = document.getElementById('process-d');
+                const pbInput = document.getElementById('process-b');
+                const pnInput = document.getElementById('process-n');
+
+                if (pdInput) pdInput.value = totalData.toFixed(2);
+                if (pbInput) pbInput.value = counts.bits.toFixed(2);
+                if (pnInput) pnInput.value = counts.noise.toFixed(2);
+                
+                // Calculate change in processed data
+                const processedDiff = Math.abs((this.previousValues.pd || 0) - totalData);
+                this.batchTracking.processedCount += processedDiff;
+                
+                // Update previous values
+                this.previousValues = {
+                    pd: totalData,
+                    pb: counts.bits,
+                    pn: counts.noise
+                };
+
+                // Check if we should log based on batch threshold and time interval
+                const now = Date.now();
+                if (this.batchTracking.processedCount >= this.batchTracking.BATCH_THRESHOLD &&
+                    (now - this.batchTracking.lastLogTime) >= this.batchTracking.MIN_LOG_INTERVAL) {
+                    
+                    console.log('Process Pool Batch Update:', {
+                        processedSinceLastLog: this.batchTracking.processedCount,
+                        currentTotals: {
+                            pd: totalData,
+                            pb: counts.bits,
+                            pn: counts.noise
+                        },
+                        timeSinceLastLog: `${((now - this.batchTracking.lastLogTime) / 1000).toFixed(1)}s`
+                    });
+
+                    // Reset batch tracking
+                    this.batchTracking.processedCount = 0;
+                    this.batchTracking.lastLogTime = now;
+                }
+            }
+        } catch (error) {
+            console.error('Error updating process pool display:', error);
+        }
+    }
+
+    stopProcessPoolMonitoring() {
+        if (this.monitoringInterval) {
+            clearInterval(this.monitoringInterval);
+            this.monitoringInterval = null;
+            console.log('Process pool monitoring stopped');
+        }
+    }
+
+    // Add cleanup method
+    cleanup() {
+        this.stopProcessPoolMonitoring();
+    }
+
+    // Make sure this is called when component is destroyed
+    destroy() {
+        this.cleanup();
+    }
+
+    async processSymbol(symbol) {
+        try {
+            // Store the symbol in the processing store
+            await this.environmentDB.storeProcessedSymbol({
+                symbol: symbol.symbol,
+                type: symbol.type,
+                timestamp: Date.now()
+            });
+
+            // Remove the processed symbol from the environment store
+            await this.environmentDB.deleteEnvironmentSymbol(symbol.id);
+
+            // Dispatch event to notify of environment store change
+            window.dispatchEvent(new CustomEvent('storeChanged', { 
+                detail: { 
+                    store: 'environment', 
+                    action: 'process',
+                    symbolType: symbol.type 
+                }
+            }));
+
+            console.log('Processed symbol:', symbol);
+        } catch (error) {
+            console.error('Error processing symbol:', error);
+            throw error;
+        }
     }
 }
