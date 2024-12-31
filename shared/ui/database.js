@@ -16,6 +16,7 @@ export class EnvironmentDatabase {
         this.dbName = 'UnifiedTriangleDB';
         this.version = 2;
         this.ready = this.initDatabase();
+        this.initializeZeroButton();
 
         EnvironmentDatabase.instance = this;
     }
@@ -100,25 +101,19 @@ export class EnvironmentDatabase {
 
     async getEnvironmentalPool() {
         try {
-            if (!this.#db) {
-                await this.ready;
-            }
-
+            await this.ready;
             const transaction = this.#db.transaction('environment', 'readonly');
             const store = transaction.objectStore('environment');
             const request = store.getAll();
-
+            
             return new Promise((resolve, reject) => {
-                request.onsuccess = () => {
-                    if (this.debugLogging) {
-                        console.log('Retrieved environmental pool:', request.result.length);
-                    }
-                    resolve(request.result);
+                request.onsuccess = (event) => {
+                    
+                    resolve(event.target.result);
                 };
-
-                request.onerror = () => {
-                    console.error('Error getting environmental pool:', request.error);
-                    reject(request.error);
+                request.onerror = (event) => {
+                    console.error('Error getting environmental pool:', event.target.error);
+                    reject(event.target.error);
                 };
             });
         } catch (error) {
@@ -314,20 +309,29 @@ export class EnvironmentDatabase {
 
     async deleteEnvironmentSymbol(id) {
         try {
-            if (!this.#db) {
-                await this.ready;
+            if (!id) {
+                throw new Error('No ID provided for deletion');
             }
-
+            
+            await this.ready;
             const transaction = this.#db.transaction('environment', 'readwrite');
             const store = transaction.objectStore('environment');
-            await store.delete(id);
             
-            // Emit store change event
-            window.dispatchEvent(new CustomEvent('storeChanged', { 
-                detail: { store: 'environment', action: 'delete', id: id }
-            }));
+            return new Promise((resolve, reject) => {
+                const request = store.delete(id);
+                
+                request.onsuccess = () => {
+                    console.log('Successfully deleted symbol with ID:', id);
+                    resolve();
+                };
+        
+                request.onerror = () => {
+                    console.error('Error deleting symbol with ID:', id);
+                    reject(request.error);
+                };
+            });
         } catch (error) {
-            console.error('Error deleting environment symbol:', error);
+            console.error('Error in deleteEnvironmentSymbol:', error);
             throw error;
         }
     }
@@ -350,6 +354,7 @@ export class EnvironmentDatabase {
                     window.dispatchEvent(new CustomEvent('storeChanged', { 
                         detail: { store: storeName, action: 'clear' }
                     }));
+                    console.log(`Dispatched 'storeChanged' event for store: ${storeName}`);
                     resolve();
                 };
                 
@@ -377,6 +382,65 @@ export class EnvironmentDatabase {
             }));
         } catch (error) {
             console.error('Error storing processed symbol:', error);
+            throw error;
+        }
+    }
+
+    initializeZeroButton() {
+        const zeroDataButton = document.getElementById('zeroDataButton');
+        if (zeroDataButton) {
+            zeroDataButton.addEventListener('click', async () => {
+                const envChecked = document.getElementById('zero-environment').checked;
+                const procChecked = document.getElementById('zero-processing').checked;
+                const convChecked = document.getElementById('zero-converted').checked;
+
+                console.log('Zeroing selected stores:', {
+                    environment: envChecked,
+                    processing: procChecked,
+                    converted: convChecked
+                });
+
+                if (envChecked) await this.clearStore('environment');
+                if (procChecked) await this.clearStore('processing');
+                if (convChecked) await this.clearStore('converted');
+            });
+        }
+    }
+
+    async updateEnvironmentalPool(id, data) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('environment', 'readwrite');
+            const store = transaction.objectStore('environment');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.get(id);
+                
+                request.onsuccess = () => {
+                    const record = request.result;
+                    if (record) {
+                        record.bits = data.bits;
+                        record.noise = data.noise;
+                        
+                        const updateRequest = store.put(record);
+                        updateRequest.onsuccess = () => {
+                            console.log('Updated environmental pool');
+                            resolve();
+                        };
+                        updateRequest.onerror = () => {
+                            reject(updateRequest.error);
+                        };
+                    } else {
+                        reject(new Error('Record not found'));
+                    }
+                };
+                
+                request.onerror = () => {
+                    reject(request.error);
+                };
+            });
+        } catch (error) {
+            console.error('Error updating environmental pool:', error);
             throw error;
         }
     }

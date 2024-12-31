@@ -170,35 +170,7 @@
     transition: background-color 0.15s ease-in-out;
 }
 
-/* Active/ON state */
-.data-controls-section button.active,
-#letterFlowToggle.active,
-#intelligenceToggle.active {
-    background-color: #198754 !important; /* Brighter green for ON state */
-    border-color: #198754 !important;
-}
 
-/* Hover state */
-.data-controls-section button:hover {
-    background-color: #145c3a !important; /* Medium green for hover */
-    border-color: #145c3a !important;
-}
-
-/* Remove margin from last button */
-.data-controls-section button:last-child {
-    margin-bottom: 0;
-}
-
-/* Keep original button styling */
-.controls-panel .btn-primary {
-    background-color: #198754;
-    border-color: #198754;
-}
-
-.controls-panel .btn-primary:hover {
-    background-color: #157347;
-    border-color: #146c43;
-}
 
 /* Update existing styles */
 #canvas-container {
@@ -1966,6 +1938,17 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     padding: 2px 5px;
 }
 
+/* Keep original button styling */
+.controls-panel .btn-primary {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.controls-panel .btn-primary:hover {
+    background-color: #157347;
+    border-color: #146c43;
+}
+
 
 .data-info-panel .panel-row {
         display: flex;
@@ -1995,6 +1978,26 @@ input[id*="euler"] {  /* Added Euler Line inputs */
         padding: 0.5rem 1rem;
     }
 
+/* Active/ON state */
+.data-controls-section button.active,
+#letterFlowToggle.active,
+#intelligenceToggle.active {
+    background-color: #198754 !important; /* Brighter green for ON state */
+    border-color: #198754 !important;
+}
+
+/* Hover state */
+.data-controls-section button:hover {
+    background-color: #145c3a !important; /* Medium green for hover */
+    border-color: #145c3a !important;
+}
+
+/* Remove margin from last button */
+.data-controls-section button:last-child {
+    margin-bottom: 0;
+}
+
+
 /* Specific styling for the right panel control sections */
 .data-controls-section .btn {
     width: 14ch !important;
@@ -2011,12 +2014,44 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     color: #fff !important;
 }
 
+
 /* Export/Import buttons and Zero Data */
 .data-controls-section .btn-info,
 .data-controls-section #zeroDataButton {
     background-color: #0dcaf0 !important;
     border-color: #0dcaf0 !important;
     color: #000 !important;
+}
+
+.zero-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    white-space: nowrap;
+}
+
+.store-checkboxes {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.store-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: white;
+    font-size: 0.875rem;
+}
+
+.store-checkbox input[type="checkbox"] {
+    margin: 0;
+    vertical-align: middle;
+}
+
+.store-checkbox label {
+    margin: 0;
+    vertical-align: middle;
 }
 
 /* Start Flow button */
@@ -2102,39 +2137,41 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     color: #fff;
 }
 
+/* Intelligence Controls Panel */
 .intelligence-controls {
     display: flex;
     flex-direction: column;
-    gap: 0.15rem;
+    gap: 3px;
+    padding: 3px;
     width: fit-content;
     margin-left: auto;
 }
 
-.intelligence-controls button {
-    width: 120px;
+.intelligence-controls .btn {
+    width: 8ch;
     text-align: center;
     background-color: #0d4429 !important; /* Dark green for OFF state */
     border-color: #0d4429 !important;
     color: white;
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
+    padding: 0.275rem 0.5rem;
+    font-size: 0.775rem;
     border-radius: 0.25rem;
     border: 1px solid transparent;
     transition: background-color 0.15s ease-in-out;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin: 0;  /* Remove any default margins */
 }
 
-/* Active/ON state */
-.intelligence-controls button.active,
-#letterFlowToggle.active,
-#intelligenceToggle.active {
-    background-color: #198754 !important; /* Brighter green for ON state */
-    border-color: #198754 !important;
-}
-
-/* Hover state */
-.intelligence-controls button:hover {
-    background-color: #145c3a !important; /* Medium green for hover */
+.intelligence-controls .btn:hover {
+    background-color: #145c3a !important;
     border-color: #145c3a !important;
+}
+
+.intelligence-controls .btn.active {
+    background-color: #198754 !important;
+    border-color: #198754 !important;
 }
 
 /* Add these new styles */
@@ -2177,3 +2214,33 @@ input[id*="euler"] {  /* Added Euler Line inputs */
 .input-row input[type="number"] {
     -moz-appearance: textfield;
 }
+
+.initialize-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.random-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: white;
+    font-size: 0.875rem;
+}
+
+.random-control input[type="checkbox"] {
+    margin: 0;
+}
+
+.button-row {
+    display: flex;
+    gap: 1px;  /* Reduced from 8px to 2px */
+    justify-content: flex-start;
+}
+
+.button-row .btn {
+    flex: 1;
+    min-width: 0;
+}
+

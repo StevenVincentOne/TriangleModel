@@ -144,19 +144,38 @@
                 <div class="animation-panel bg-dark p-2 rounded">
                     <!-- System Controls Buttons -->
                     <div class="intelligence-controls">
-                        <button id="initializeSystem" class="btn">Initialize</button>
-                        <button id="processDataButton" class="btn">Process</button>
-                        <button id="letterFlowToggle" class="btn">ConvertData</button>
-                        <button id="intelligenceToggle" class="btn">Animate</button>
-                        <button id="zeroDataButton" class="btn">Zero Data</button>
+                        <div class="initialize-row">
+                            <button id="initializeSystem" class="btn">Init</button>
+                            <div class="random-control">
+                                <input type="checkbox" id="randomize-data" checked>
+                                <label for="randomize-data">Random</label>
+                            </div>
+                        </div>
+                        <div class="zero-controls">
+                            <button id="zeroDataButton" class="btn">Zero</button>
+                            <div class="store-checkboxes">
+                                <div class="store-checkbox">
+                                    <input type="checkbox" id="zero-environment" checked>
+                                    <label for="zero-environment">E</label>
+                                </div>
+                                <div class="store-checkbox">
+                                    <input type="checkbox" id="zero-processing" checked>
+                                    <label for="zero-processing">P</label>
+                                </div>
+                                <div class="store-checkbox">
+                                    <input type="checkbox" id="zero-converted" checked>
+                                    <label for="zero-converted">C</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="button-row">
+                            <button id="processDataButton" class="btn">Import</button>
+                            <button id="letterFlowToggle" class="btn">Convert</button>
+                            <button id="intelligenceToggle" class="btn">State</button>
+                        </div>
                     </div>
                     <!-- System Internal Data Controls -->
                     <div class="system-intelligence-inputs mt-3">
-                        <!-- Add Randomize checkbox after Zero Data button -->
-                        <div class="input-row">
-                            <input type="checkbox" id="randomize-data" checked>
-                            <label for="randomize-data">Randomize</label>
-                        </div>
 
                         <!-- Environmental Data Inputs -->
                         <div class="input-row">

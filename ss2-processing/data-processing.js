@@ -46,7 +46,7 @@ export class LossFunction {
     // Determine if a letter results in entropy based on the loss factor
     processDataLoss(letter) {
         const isEntropy = Math.random() < this.lossFactors.inputLoss;
-        console.log(`Processing letter: "${letter}" with loss factor: ${(this.lossFactors.inputLoss * 100).toFixed(2)}% Result: ${isEntropy ? 'Entropy (E)' : 'Data (D)'}`);
+        console.log(`Processing letter: "${letter}" with loss factor: ${Math.round(this.lossFactors.inputLoss * 100)}% Result: ${isEntropy ? 'Entropy (E)' : 'Data (D)'}`);
         return { entropy: isEntropy, value: isEntropy ? 'E' : 'D' };
     }
 
@@ -64,7 +64,7 @@ export class LossFunction {
     setLossFactor(value) {
         if (value >= 0 && value <= 1) {
             this.lossFactors.inputLoss = value;
-            console.log('Loss factor updated to:', `${this.lossFactors.inputLoss * 100}%`);
+            console.log('Loss factor updated to:', `${Math.round(this.lossFactors.inputLoss * 100)}%`);
         }
     }
 
@@ -76,7 +76,7 @@ export class LossFunction {
     setBitsLossFactor(value) {
         if (value >= 0 && value <= 1) {
             this.lossFactors.bitsLoss = value;
-            console.log('Bits loss factor updated to:', `${this.lossFactors.bitsLoss * 100}%`);
+            console.log('Bits loss factor updated to:', `${Math.round(this.lossFactors.bitsLoss * 100)}%`);
         }
     }
 
@@ -87,7 +87,7 @@ export class LossFunction {
     setNoiseGainFactor(value) {
         if (value >= 0 && value <= 1) {
             this.lossFactors.noiseGain = value;
-            console.log('Noise gain factor updated to:', `${this.lossFactors.noiseGain * 100}%`);
+            console.log('Noise gain factor updated to:', `${Math.round(this.lossFactors.noiseGain * 100)}%`);
         }
     }
 
@@ -200,6 +200,16 @@ export class DataProcessing {
         
         this.setupControls();
         this.startProcessPoolMonitoring();
+
+        this.initializeDashboardElements();
+        
+        // Listen for store changes
+        window.addEventListener('storeChanged', async (event) => {
+            if (event.detail.store === 'processing') {
+                // Update processing inputs immediately when store changes
+                await this.updateProcessingDisplay();
+            }
+        });
     }
 
     async init() {
@@ -323,50 +333,85 @@ export class DataProcessing {
 
     updateDashboard() {
         if (this.dashboardElements.processData) {
-            this.dashboardElements.processData.value = this.processingPool.totalData.toFixed(2);
+            this.dashboardElements.processData.value = Math.round(this.processingPool.totalData);
         }
         if (this.dashboardElements.processBits) {
-            this.dashboardElements.processBits.value = this.processingPool.processBits.toFixed(2);
+            this.dashboardElements.processBits.value = Math.round(this.processingPool.processBits);
         }
         if (this.dashboardElements.processNoise) {
-            this.dashboardElements.processNoise.value = this.processingPool.processNoise.toFixed(2);
+            this.dashboardElements.processNoise.value = Math.round(this.processingPool.processNoise);
         }
     }
 
     async startProcessing() {
-        console.log('startProcessing called');
-        if (!this.environmentDB) {
-            console.error('No database connection available');
-            return;
-        }
-
-        try {
-            console.log('Setting up process interval');
-            this.processInterval = setInterval(async () => {
-                try {
-                    // Get data from environmental pool
-                    const envData = await this.environmentDB.getEnvironmentalPool();
-                    console.log('Retrieved environmental data:', envData);
-
-                    if (!envData || envData.length === 0) {
-                        console.log('No environmental data available');
-                        return;
-                    }
-
-                    // Process the array of symbols
-                    for (const symbol of envData) {
-                        // Process each symbol
-                        await this.processSymbol(symbol);
-                    }
-
-                } catch (error) {
-                    console.error('Error in processing cycle:', error);
+        console.log('Starting processing...');
+        
+        const flowRateInput = document.getElementById('flow-rate');
+        const pbFlowRateInput = document.getElementById('pb-flow-rate');
+        const symbolsPerSecond = parseInt(flowRateInput.value) || 10;
+        const pbFlowPercent = parseInt(pbFlowRateInput.value) || 50;
+        const intervalMs = 1000 / symbolsPerSecond;
+        
+        this.processInterval = setInterval(async () => {
+            try {
+                const environmentalData = await this.environmentDB.getEnvironmentalPool();
+                
+                if (!environmentalData || environmentalData.length === 0) {
+                    console.log('No environmental data to process');
+                    this.stopProcessing();
+                    return;
                 }
-            }, 1000);
 
-        } catch (error) {
-            console.error('Error starting processing:', error);
-        }
+                const currentData = environmentalData[0];
+                
+                // Decide whether to process bit or noise based on flow rate percentages
+                const processBit = Math.random() * 100 < pbFlowPercent;
+                
+                let symbol = null;
+                let type = null;
+
+                if (processBit) {
+                    // Try to process a bit if available
+                    if (currentData.bits && currentData.bits.length > 0) {
+                        symbol = currentData.bits.shift();
+                        type = 'bit';
+                    }
+                    // If no bits available but noise exists, process noise instead
+                    else if (currentData.noise && currentData.noise.length > 0) {
+                        symbol = currentData.noise.shift();
+                        type = 'noise';
+                    }
+                } else {
+                    // Try to process noise if available
+                    if (currentData.noise && currentData.noise.length > 0) {
+                        symbol = currentData.noise.shift();
+                        type = 'noise';
+                    }
+                    // If no noise available but bits exist, process bits instead
+                    else if (currentData.bits && currentData.bits.length > 0) {
+                        symbol = currentData.bits.shift();
+                        type = 'bit';
+                    }
+                }
+
+                if (symbol) {
+                    await this.processSymbol({
+                        parentId: currentData.id,
+                        symbol: symbol,
+                        type: type,
+                        remainingBits: currentData.bits,
+                        remainingNoise: currentData.noise
+                    });
+                } else {
+                    console.log('No more symbols to process');
+                    this.stopProcessing();
+                }
+
+            } catch (error) {
+                console.error('Error in processing interval:', error);
+                this.stopProcessing();
+            }
+        }, intervalMs);
     }
 
     async processNextSymbol(envData) {
@@ -435,6 +480,18 @@ export class DataProcessing {
             this.processInterval = null;
         }
         this.isProcessing = false;
+
+        // Force one final update with whole numbers
+        if (this.dashboardElements.processData) {
+            this.dashboardElements.processData.value = Math.round(this.dashboardElements.processData.value);
+        }
+        if (this.dashboardElements.processBits) {
+            this.dashboardElements.processBits.value = Math.round(this.dashboardElements.processBits.value);
+        }
+        if (this.dashboardElements.processNoise) {
+            this.dashboardElements.processNoise.value = Math.round(this.dashboardElements.processNoise.value);
+        }
+
         console.log('Processing stopped');
     }
 
@@ -572,9 +629,9 @@ export class DataProcessing {
                     const pbInput = document.getElementById('process-b');
                     const pnInput = document.getElementById('process-n');
 
-                    if (pdInput) pdInput.value = '0.00';
-                    if (pbInput) pbInput.value = '0.00';
-                    if (pnInput) pnInput.value = '0.00';
+                    if (pdInput) pdInput.value = '0';
+                    if (pbInput) pbInput.value = '0';
+                    if (pnInput) pnInput.value = '0';
                     
                     this.previousValues = { pd: 0, pb: 0, pn: 0 };
                 }
@@ -605,9 +662,9 @@ export class DataProcessing {
                 const pbInput = document.getElementById('process-b');
                 const pnInput = document.getElementById('process-n');
 
-                if (pdInput) pdInput.value = totalData.toFixed(2);
-                if (pbInput) pbInput.value = counts.bits.toFixed(2);
-                if (pnInput) pnInput.value = counts.noise.toFixed(2);
+                if (pdInput) pdInput.value = Math.round(totalData);
+                if (pbInput) pbInput.value = Math.round(counts.bits);
+                if (pnInput) pnInput.value = Math.round(counts.noise);
                 
                 // Calculate change in processed data
                 const processedDiff = Math.abs((this.previousValues.pd || 0) - totalData);
@@ -663,31 +720,98 @@ export class DataProcessing {
         this.cleanup();
     }
 
-    async processSymbol(symbol) {
+    async processSymbol(symbolData) {
         try {
+            console.log('Processing symbol data:', symbolData);
+            
+            // Get PB Loss rate
+            const pbLossRate = parseInt(document.getElementById('pb-loss-rate').value) || 0;
+            
+            // Determine if bit should be converted to noise
+            let finalType = symbolData.type;
+            let finalSymbol = symbolData.symbol;
+            
+            if (symbolData.type === 'bit' && (Math.random() * 100) < pbLossRate) {
+                // Convert bit to corresponding noise symbol
+                finalType = 'noise';
+                finalSymbol = this.convertBitToNoise(symbolData.symbol);
+                console.log(`Bit ${symbolData.symbol} converted to noise ${finalSymbol} due to PB Loss`);
+            }
+
             // Store the symbol in the processing store
             await this.environmentDB.storeProcessedSymbol({
-                symbol: symbol.symbol,
-                type: symbol.type,
+                symbol: finalSymbol,
+                type: finalType,
                 timestamp: Date.now()
             });
 
-            // Remove the processed symbol from the environment store
-            await this.environmentDB.deleteEnvironmentSymbol(symbol.id);
+            // Update the environmental data with the remaining symbols
+            await this.environmentDB.updateEnvironmentalPool(symbolData.parentId, {
+                bits: symbolData.remainingBits,
+                noise: symbolData.remainingNoise
+            });
 
-            // Dispatch event to notify of environment store change
             window.dispatchEvent(new CustomEvent('storeChanged', { 
                 detail: { 
                     store: 'environment', 
                     action: 'process',
-                    symbolType: symbol.type 
+                    symbolType: finalType 
                 }
             }));
 
-            console.log('Processed symbol:', symbol);
+            console.log('Successfully processed symbol:', finalSymbol);
         } catch (error) {
             console.error('Error processing symbol:', error);
             throw error;
+        }
+    }
+
+    // Add conversion method
+    convertBitToNoise(bitSymbol) {
+        // Mapping of English letters to Greek letters
+        const conversionMap = {
+            'A': 'α', 'B': 'β', 'C': 'γ', 'D': 'δ', 'E': 'ε',
+            'F': 'ζ', 'G': 'η', 'H': 'θ', 'I': 'ι', 'J': 'κ',
+            'K': 'λ', 'L': 'μ', 'M': 'ν', 'N': 'ξ', 'O': 'ο',
+            'P': 'π', 'Q': 'ρ', 'R': 'σ', 'S': 'τ', 'T': 'υ',
+            'U': 'φ', 'V': 'χ', 'W': 'ψ', 'X': 'ω', 'Y': 'Ω',
+            'Z': 'Σ', '&': 'ς', '/': 'τ', '+': 'ξ', '∅': 'ψ'
+        };
+
+        // Convert to uppercase to match the map
+        const upperBit = bitSymbol.toUpperCase();
+        
+        // Return the converted symbol or the original if no mapping exists
+        return conversionMap[upperBit] || upperBit;
+    }
+
+    async updateProcessingDisplay() {
+        try {
+            const processedData = await this.environmentDB.getProcessedSymbols();
+            
+            // Calculate totals
+            let totalBits = 0;
+            let totalNoise = 0;
+            
+            processedData.forEach(item => {
+                if (item.type === 'bit') totalBits++;
+                if (item.type === 'noise') totalNoise++;
+            });
+            
+            const totalData = totalBits + totalNoise;
+
+            // Update displays with whole numbers
+            if (this.dashboardElements.processData) {
+                this.dashboardElements.processData.value = Math.round(totalData);
+            }
+            if (this.dashboardElements.processBits) {
+                this.dashboardElements.processBits.value = Math.round(totalBits);
+            }
+            if (this.dashboardElements.processNoise) {
+                this.dashboardElements.processNoise.value = Math.round(totalNoise);
+            }
+        } catch (error) {
+            console.error('Error updating processing display:', error);
         }
     }
 }

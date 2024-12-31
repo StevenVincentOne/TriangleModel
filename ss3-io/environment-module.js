@@ -43,20 +43,7 @@ export class EnvironmentModule {
         
         
         
-        // Remove the initialize button handler from here since it's handled in index.js
         
-        // Keep the zero data button handler
-        const zeroDataButton = document.getElementById('zeroDataButton');
-        if (zeroDataButton) {
-            zeroDataButton.addEventListener('click', () => {
-                this.stopLetterGeneration();
-                const toggleBtn = document.getElementById('letterFlowToggle');
-                if (toggleBtn) {
-                    toggleBtn.textContent = 'Start Flow';
-                    toggleBtn.classList.remove('active');
-                }
-            });
-        }
 
         // Add debug logging
         console.log('Environment Module initialized with:', {
@@ -546,43 +533,51 @@ export class EnvironmentModule {
         try {
             // Get all symbols from environment store
             const environmentalData = await this.environmentDB.getEnvironmentalPool();
-            const currentData = environmentalData[0];
             
-            if (!currentData) {
+            
+            if (!environmentalData || environmentalData.length === 0) {
                 
+                // Set inputs to 0
+                this.setEnvironmentInputs(0, 0, 0);
                 return;
             }
 
+            // Get the first (and should be only) data set
+            const currentData = environmentalData[0];
+            
             // Calculate totals from arrays
             const totalBits = currentData.bits?.length || 0;
             const totalNoise = currentData.noise?.length || 0;
             const totalData = totalBits + totalNoise;
 
-            // Check if values have changed before updating
-            const edInput = document.getElementById('system-ed');
-            const ebInput = document.getElementById('system-eb');
-            const enInput = document.getElementById('system-en');
-
-            const hasChanged = 
-                edInput && parseFloat(edInput.value) !== totalData ||
-                ebInput && parseFloat(ebInput.value) !== totalBits ||
-                enInput && parseFloat(enInput.value) !== totalNoise;
-
-            // Only update and log if values have changed
-            if (hasChanged) {
-                if (edInput) edInput.value = totalData.toFixed(2);
-                if (ebInput) ebInput.value = totalBits.toFixed(2);
-                if (enInput) enInput.value = totalNoise.toFixed(2);
-
-                console.log('Environmental Data values updated:', {
-                    totalData,
-                    totalBits,
-                    totalNoise
-                });
-            }
+            // Update the input displays
+            this.setEnvironmentInputs(totalData, totalBits, totalNoise);
         } catch (error) {
             console.error('Error updating environment display:', error);
+            // On error, set inputs to 0
+            this.setEnvironmentInputs(0, 0, 0);
         }
+    }
+
+    setEnvironmentInputs(totalData, totalBits, totalNoise) {
+        const edInput = document.getElementById('system-ed');
+        const ebInput = document.getElementById('system-eb');
+        const enInput = document.getElementById('system-en');
+
+        if (edInput) {
+            edInput.value = Math.round(totalData);
+            
+        }
+        if (ebInput) {
+            ebInput.value = Math.round(totalBits);
+            
+        }
+        if (enInput) {
+            enInput.value = Math.round(totalNoise);
+            
+        }
+
+        
     }
 
     async startStoreMonitoring() {
@@ -625,7 +620,7 @@ export class EnvironmentModule {
         // Update immediately
         this.updateEnvironmentDisplay();
         
-        // Listen for ALL store changes
+        // Listen for 'storeChanged' events
         window.addEventListener('storeChanged', async (event) => {
             if (event.detail.store === 'environment') {
                 console.log('Environment store changed:', event.detail.action);
@@ -633,6 +628,13 @@ export class EnvironmentModule {
                 await this.updateEnvironmentDisplay();
             }
         });
+        
+        // Optionally keep polling (if desired)
+        /*
+        this.monitorInterval = setInterval(() => {
+            this.updateEnvironmentDisplay();
+        }, 1000);
+        */
     }
 }
 
@@ -707,13 +709,3 @@ class EnvironmentalData {
     }
 }
 
-document.getElementById('zeroDataButton')?.addEventListener('click', () => {
-    const button = document.getElementById('zeroDataButton');
-    if (button) {
-        button.classList.add('flash');
-        setTimeout(() => {
-            button.classList.remove('flash');
-        }, 1000);
-    }
-    // ... rest of zero data functionality
-});
