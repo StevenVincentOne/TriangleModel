@@ -15,59 +15,312 @@ export class EnvironmentDatabase {
         
         this.dbName = 'UnifiedTriangleDB';
         this.version = 2;
-        this.ready = this.initDatabase();
+        this.ready = this.initializeDatabase();
         this.initializeZeroButton();
 
         EnvironmentDatabase.instance = this;
     }
 
-    async initDatabase() {
-        if (this.#db) {
-            console.log('Database already initialized');
-            return this.#db;
+    async initializeDatabase() {
+        try {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('EnvironmentDB', 4);
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    
+                    // Create/maintain environment store
+                    if (!db.objectStoreNames.contains('environment')) {
+                        db.createObjectStore('environment', { keyPath: 'id', autoIncrement: true });
+                    }
+                    
+                    // Rename 'processing' to 'uptake'
+                    if (db.objectStoreNames.contains('processing')) {
+                        const processingData = [];
+                        const transaction = event.target.transaction;
+                        
+                        // Get all data from processing store
+                        const processingStore = transaction.objectStore('processing');
+                        processingStore.getAll().onsuccess = (e) => {
+                            processingData.push(...e.target.result);
+                        };
+                        
+                        db.deleteObjectStore('processing');
+                        const uptakeStore = db.createObjectStore('uptake', { keyPath: 'id', autoIncrement: true });
+                        
+                        // Restore data to new store
+                        processingData.forEach(item => {
+                            uptakeStore.add(item);
+                        });
+                    } else if (!db.objectStoreNames.contains('uptake')) {
+                        db.createObjectStore('uptake', { keyPath: 'id', autoIncrement: true });
+                    }
+                    
+                    // Rename 'convertPool' to 'processingPool'
+                    if (db.objectStoreNames.contains('convertPool')) {
+                        const poolData = [];
+                        const transaction = event.target.transaction;
+                        
+                        // Get all data from convertPool store
+                        const convertPoolStore = transaction.objectStore('convertPool');
+                        convertPoolStore.getAll().onsuccess = (e) => {
+                            poolData.push(...e.target.result);
+                        };
+                        
+                        db.deleteObjectStore('convertPool');
+                        const processingPoolStore = db.createObjectStore('processingPool', { keyPath: 'symbol' });
+                        
+                        // Restore data to new store
+                        poolData.forEach(item => {
+                            processingPoolStore.add(item);
+                        });
+                    } else if (!db.objectStoreNames.contains('processingPool')) {
+                        db.createObjectStore('processingPool', { keyPath: 'symbol' });
+                    }
+                    
+                    if (!db.objectStoreNames.contains('convertedBytes')) {
+                        db.createObjectStore('convertedBytes', { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+
+                request.onsuccess = (event) => {
+                    this.#db = event.target.result;
+                    console.log('Database initialized successfully');
+                    resolve();
+                };
+
+                request.onerror = () => {
+                    console.error('Error opening database:', request.error);
+                    reject(request.error);
+                };
+            });
+        } catch (error) {
+            console.error('Error initializing database:', error);
+            throw error;
         }
+    }
 
-        return new Promise((resolve, reject) => {
-            console.log('Initializing unified database...');
-            const request = indexedDB.open(this.dbName, this.version);
+    // Generic store operations
+    async addToStore(storeName, data) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            
+            return new Promise((resolve, reject) => {
+                const request = store.add(data);
+                
+                request.onsuccess = () => {
+                    resolve(request.result);
+                };
+                
+                request.onerror = () => {
+                    reject(request.error);
+                };
+            });
+        } catch (error) {
+            console.error(`Error adding to ${storeName}:`, error);
+            throw error;
+        }
+    }
 
-            request.onerror = (event) => {
-                console.error('Database error:', event.target.error);
-                reject(event.target.error);
+    async getAllFromStore(storeName) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction(storeName, 'readonly');
+            const store = transaction.objectStore(storeName);
+            
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                
+                request.onsuccess = () => {
+                    resolve(request.result);
+                };
+                
+                request.onerror = () => {
+                    reject(request.error);
+                };
+            });
+        } catch (error) {
+            console.error(`Error getting all from ${storeName}:`, error);
+            throw error;
+        }
+    }
+
+    // Specific store methods
+    async storeUptakeSymbol(symbol) {
+        return this.addToStore('uptake', symbol);
+    }
+
+    async getUptakeSymbols() {
+        return this.getAllFromStore('uptake');
+    }
+
+    async deleteUptakeSymbol(id) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('uptake', 'readwrite');
+            const store = transaction.objectStore('uptake');
+            return store.delete(id);
+        } catch (error) {
+            console.error('Error deleting uptake symbol:', error);
+            throw error;
+        }
+    }
+
+    async storeProcessingPoolSymbol(symbol) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('processingPool', 'readwrite');
+            const store = transaction.objectStore('processingPool');
+            
+            // Get existing count for this symbol
+            const request = store.get(symbol.symbol);
+            
+            return new Promise((resolve, reject) => {
+                request.onsuccess = async () => {
+                    const existingRecord = request.result;
+                    
+                    if (existingRecord) {
+                        // Update existing count
+                        existingRecord.count++;
+                        const updateRequest = store.put(existingRecord);
+                        
+                        updateRequest.onsuccess = () => {
+                            console.log(`Updated count for symbol ${symbol.symbol} to ${existingRecord.count}`);
+                            resolve(updateRequest.result);
+                        };
+                        
+                        updateRequest.onerror = () => reject(updateRequest.error);
+                    } else {
+                        // Create new record
+                        const newRecord = {
+                            symbol: symbol.symbol,
+                            type: symbol.type,
+                            count: 1,
+                            timestamp: Date.now()
+                        };
+                        
+                        const addRequest = store.put(newRecord);
+                        
+                        addRequest.onsuccess = () => {
+                            console.log(`Created new count for symbol ${symbol.symbol}`);
+                            resolve(addRequest.result);
+                        };
+                        
+                        addRequest.onerror = () => reject(addRequest.error);
+                    }
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error storing processing pool symbol:', error);
+            throw error;
+        }
+    }
+
+    async getProcessingPoolSymbols() {
+        return this.getAllFromStore('processingPool');
+    }
+
+    async getProcessingPoolCounts() {
+        try {
+            const symbols = await this.getAllFromStore('processingPool');
+            const counts = {
+                bits: {},
+                totalBits: 0,
+                noise: 0
             };
-
-            request.onupgradeneeded = (event) => {
-                console.log('Creating/upgrading database schema');
-                const db = event.target.result;
-
-                // Create stores if they don't exist
-                if (!db.objectStoreNames.contains('environment')) {
-                    const envStore = db.createObjectStore('environment', { keyPath: 'id', autoIncrement: true });
-                    envStore.createIndex('type', 'type', { unique: false });
-                    envStore.createIndex('timestamp', 'timestamp', { unique: false });
+            
+            symbols.forEach(record => {
+                if (record.type === 'bit') {
+                    counts.bits[record.symbol] = record.count;
+                    counts.totalBits += record.count;
+                } else if (record.type === 'noise') {
+                    counts.noise += record.count;
                 }
+            });
+            
+            return counts;
+        } catch (error) {
+            console.error('Error getting processing pool counts:', error);
+            throw error;
+        }
+    }
 
-                if (!db.objectStoreNames.contains('processing')) {
-                    const procStore = db.createObjectStore('processing', { keyPath: 'id', autoIncrement: true });
-                    procStore.createIndex('type', 'type', { unique: false });
-                    procStore.createIndex('timestamp', 'timestamp', { unique: false });
-                }
+    async decrementProcessingPoolSymbol(symbol, amount) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('processingPool', 'readwrite');
+            const store = transaction.objectStore('processingPool');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.get(symbol);
+                
+                request.onsuccess = async () => {
+                    const record = request.result;
+                    if (record) {
+                        record.count -= amount;
+                        
+                        if (record.count <= 0) {
+                            // Remove record if count reaches 0
+                            store.delete(symbol);
+                        } else {
+                            // Update with new count
+                            store.put(record);
+                        }
+                        resolve();
+                    } else {
+                        reject(new Error(`Symbol ${symbol} not found in processing pool`));
+                    }
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error decrementing processing pool symbol:', error);
+            throw error;
+        }
+    }
 
-                if (!db.objectStoreNames.contains('converted')) {
-                    const convStore = db.createObjectStore('converted', { keyPath: 'id', autoIncrement: true });
-                    convStore.createIndex('type', 'type', { unique: false });
-                    convStore.createIndex('timestamp', 'timestamp', { unique: false });
-                }
+    async storeConvertedByte(byte) {
+        return this.addToStore('convertedBytes', byte);
+    }
 
-                console.log('Database schema created with stores:', Array.from(db.objectStoreNames));
-            };
+    async getConvertedBytes() {
+        return this.getAllFromStore('convertedBytes');
+    }
 
-            request.onsuccess = (event) => {
-                this.#db = event.target.result;
-                console.log('Database connection established');
-                resolve(this.#db);
-            };
-        });
+    async deleteProcessedSymbol(id) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('processing', 'readwrite');
+            const store = transaction.objectStore('processing');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.delete(id);
+                
+                request.onsuccess = () => {
+                    resolve();
+                };
+                
+                request.onerror = () => {
+                    reject(request.error);
+                };
+            });
+        } catch (error) {
+            console.error('Error deleting processed symbol:', error);
+            throw error;
+        }
+    }
+
+    async getProcessedSymbols() {
+        return this.getAllFromStore('processing');
+    }
+
+    async getEnvironmentalPool() {
+        return this.getAllFromStore('environment');
     }
 
     async storeEnvironmentSymbol(symbolData) {
@@ -99,33 +352,6 @@ export class EnvironmentDatabase {
         }
     }
 
-    async getEnvironmentalPool() {
-        try {
-            await this.ready;
-            const transaction = this.#db.transaction('environment', 'readonly');
-            const store = transaction.objectStore('environment');
-            const request = store.getAll();
-            
-            return new Promise((resolve, reject) => {
-                request.onsuccess = (event) => {
-                    
-                    resolve(event.target.result);
-                };
-                request.onerror = (event) => {
-                    console.error('Error getting environmental pool:', event.target.error);
-                    reject(event.target.error);
-                };
-            });
-        } catch (error) {
-            console.error('Error in getEnvironmentalPool:', error);
-            return [];
-        }
-    }
-
-    async getEnvironmentSymbols() {
-        return this.getEnvironmentalPool(); // Alias for compatibility
-    }
-
     async storeProcessedSymbol(symbolData) {
         try {
             if (!this.#db) {
@@ -152,122 +378,6 @@ export class EnvironmentDatabase {
         } catch (error) {
             console.error('Error in storeProcessedSymbol:', error);
             throw error;
-        }
-    }
-
-    async getProcessedSymbols() {
-        try {
-            if (!this.#db) {
-                await this.ready;
-            }
-
-            const transaction = this.#db.transaction('processing', 'readonly');
-            const store = transaction.objectStore('processing');
-            const request = store.getAll();
-
-            return new Promise((resolve, reject) => {
-                request.onsuccess = () => {
-                    if (this.debugLogging) {
-                        console.log('Retrieved processed symbols:', request.result.length);
-                    }
-                    resolve(request.result);
-                };
-
-                request.onerror = () => {
-                    console.error('Error getting processed symbols:', request.error);
-                    reject(request.error);
-                };
-            });
-        } catch (error) {
-            console.error('Error in getProcessedSymbols:', error);
-            return [];
-        }
-    }
-
-    async deleteProcessedSymbol(id) {
-        try {
-            if (!this.#db) {
-                await this.ready;
-            }
-
-            const transaction = this.#db.transaction('processing', 'readwrite');
-            const store = transaction.objectStore('processing');
-            const request = store.delete(id);
-
-            return new Promise((resolve, reject) => {
-                request.onsuccess = () => {
-                    if (this.debugLogging) {
-                        console.log('Deleted processed symbol with id:', id);
-                    }
-                    resolve();
-                };
-
-                request.onerror = () => {
-                    console.error('Error deleting processed symbol:', request.error);
-                    reject(request.error);
-                };
-            });
-        } catch (error) {
-            console.error('Error in deleteProcessedSymbol:', error);
-            throw error;
-        }
-    }
-
-    async storeConvertedSymbol(symbolData) {
-        try {
-            if (!this.#db) {
-                await this.ready;
-            }
-
-            const transaction = this.#db.transaction('converted', 'readwrite');
-            const store = transaction.objectStore('converted');
-            const request = store.add(symbolData);
-
-            return new Promise((resolve, reject) => {
-                request.onsuccess = () => {
-                    if (this.debugLogging) {
-                        console.log('Stored converted symbol:', symbolData);
-                    }
-                    resolve(request.result);
-                };
-
-                request.onerror = () => {
-                    console.error('Error storing converted symbol:', request.error);
-                    reject(request.error);
-                };
-            });
-        } catch (error) {
-            console.error('Error in storeConvertedSymbol:', error);
-            throw error;
-        }
-    }
-
-    async getConvertedSymbols() {
-        try {
-            if (!this.#db) {
-                await this.ready;
-            }
-
-            const transaction = this.#db.transaction('converted', 'readonly');
-            const store = transaction.objectStore('converted');
-            const request = store.getAll();
-
-            return new Promise((resolve, reject) => {
-                request.onsuccess = () => {
-                    if (this.debugLogging) {
-                        console.log('Retrieved converted symbols:', request.result.length);
-                    }
-                    resolve(request.result);
-                };
-
-                request.onerror = () => {
-                    console.error('Error getting converted symbols:', request.error);
-                    reject(request.error);
-                };
-            });
-        } catch (error) {
-            console.error('Error in getConvertedSymbols:', error);
-            return [];
         }
     }
 
@@ -391,18 +501,22 @@ export class EnvironmentDatabase {
         if (zeroDataButton) {
             zeroDataButton.addEventListener('click', async () => {
                 const envChecked = document.getElementById('zero-environment').checked;
-                const procChecked = document.getElementById('zero-processing').checked;
+                const uptakeChecked = document.getElementById('zero-processing').checked;
                 const convChecked = document.getElementById('zero-converted').checked;
 
                 console.log('Zeroing selected stores:', {
                     environment: envChecked,
-                    processing: procChecked,
-                    converted: convChecked
+                    uptake: uptakeChecked,
+                    processingPool: convChecked,
+                    convertedBytes: convChecked
                 });
 
                 if (envChecked) await this.clearStore('environment');
-                if (procChecked) await this.clearStore('processing');
-                if (convChecked) await this.clearStore('converted');
+                if (uptakeChecked) await this.clearStore('uptake');
+                if (convChecked) {
+                    await this.clearStore('processingPool');
+                    await this.clearStore('convertedBytes');
+                }
             });
         }
     }
@@ -441,6 +555,139 @@ export class EnvironmentDatabase {
             });
         } catch (error) {
             console.error('Error updating environmental pool:', error);
+            throw error;
+        }
+    }
+
+    async decrementProcessingPoolBits(symbol, amount) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('processingPool', 'readwrite');
+            const store = transaction.objectStore('processingPool');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.get(symbol);
+                
+                request.onsuccess = async () => {
+                    const record = request.result;
+                    if (record && record.type === 'bit' && record.count >= amount) {
+                        record.count -= amount;
+                        
+                        if (record.count <= 0) {
+                            // Remove record if count reaches 0
+                            store.delete(symbol);
+                        } else {
+                            // Update with new count
+                            store.put(record);
+                        }
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error decrementing processing pool bits:', error);
+            throw error;
+        }
+    }
+
+    async storeConvertedBytes(byteData) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('convertedBytes', 'readwrite');
+            const store = transaction.objectStore('convertedBytes');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.add({
+                    ...byteData,
+                    timestamp: Date.now()
+                });
+                
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error storing converted bytes:', error);
+            throw error;
+        }
+    }
+
+    async getConvertedBytes() {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('convertedBytes', 'readonly');
+            const store = transaction.objectStore('convertedBytes');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error getting converted bytes:', error);
+            throw error;
+        }
+    }
+
+    async getProcessingPool() {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('processingPool', 'readonly');
+            const store = transaction.objectStore('processingPool');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                
+                request.onsuccess = () => {
+                    resolve(request.result);
+                };
+                
+                request.onerror = () => {
+                    console.error('Error getting processing pool:', request.error);
+                    reject(request.error);
+                };
+            });
+        } catch (error) {
+            console.error('Error accessing processing pool:', error);
+            throw error;
+        }
+    }
+
+    async decrementProcessingPoolNoise(symbol, amount) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('processingPool', 'readwrite');
+            const store = transaction.objectStore('processingPool');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.get(symbol);
+                
+                request.onsuccess = async () => {
+                    const record = request.result;
+                    if (record && record.type === 'noise' && record.count >= amount) {
+                        record.count -= amount;
+                        
+                        if (record.count <= 0) {
+                            // Remove record if count reaches 0
+                            store.delete(symbol);
+                        } else {
+                            // Update with new count
+                            store.put(record);
+                        }
+                        resolve(true);
+                    } else {
+                        resolve(false);
+                    }
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error decrementing processing pool noise:', error);
             throw error;
         }
     }

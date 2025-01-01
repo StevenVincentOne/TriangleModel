@@ -80,6 +80,7 @@
             padding: 0.375rem 0.75rem;
             width: auto !important;
             min-width: fit-content;
+            min-width: -webkit-fill-available;
             height: auto !important;
             white-space: nowrap;
             display: inline-flex;
@@ -2213,6 +2214,7 @@ input[id*="euler"] {  /* Added Euler Line inputs */
 /* Firefox */
 .input-row input[type="number"] {
     -moz-appearance: textfield;
+    appearance: textfield;
 }
 
 .initialize-row {

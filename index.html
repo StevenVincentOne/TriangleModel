@@ -160,24 +160,28 @@
                                 </div>
                                 <div class="store-checkbox">
                                     <input type="checkbox" id="zero-processing" checked>
-                                    <label for="zero-processing">P</label>
+                                    <label for="zero-processing">U</label>
                                 </div>
                                 <div class="store-checkbox">
                                     <input type="checkbox" id="zero-converted" checked>
-                                    <label for="zero-converted">C</label>
+                                    <label for="zero-converted">P</label>
+                                </div>
+                                <div class="store-checkbox">
+                                    <input type="checkbox" id="zero-conv-bytes" checked>
+                                    <label for="zero-conv-bytes">C</label>
                                 </div>
                             </div>
                         </div>
                         <div class="button-row">
-                            <button id="processDataButton" class="btn">Import</button>
-                            <button id="letterFlowToggle" class="btn">Convert</button>
-                            <button id="intelligenceToggle" class="btn">State</button>
+                            <button id="processDataButton" class="btn">Uptake</button>
+                            <button id="letterFlowToggle" class="btn">Pool</button>
+                            <button id="convertBitsButton" class="btn">Convert</button>
                         </div>
                     </div>
                     <!-- System Internal Data Controls -->
                     <div class="system-intelligence-inputs mt-3">
 
-                        <!-- Environmental Data Inputs -->
+                        <!-- Environmental Data Inputs and Controls -->
                         <div class="input-row">
                             <label for="system-ed">ED</label>
                             <input id="system-ed" type="text" readonly value="0">
@@ -197,63 +201,81 @@
                             <input type="number" id="en-percent" min="0" max="100" value="50">
                         </div>
 
-                        <!-- Processing Pool Inputs -->
+                        <!-- Uptake Pool Inputs and Controls -->
+                         <div class="input-row">
+                            <label for="pb-loss-rate">UB Loss %</label>
+                            <input type="number" id="pb-loss-rate" min="0" max="100" value="0">
+                        </div>
                         <div class="input-row">
-                            <label for="process-d">PD</label>
+                            <label for="process-d">UD</label>
                             <input id="process-d" type="text" readonly value="0">
                             <label for="flow-rate">R</label>
                             <input type="number" id="flow-rate" min="0" max="1000" value="10" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="process-b">PB</label>
+                            <label for="process-b">UB</label>
                             <input id="process-b" type="text" readonly value="0">
                             <label for="pb-flow-rate">%</label>
                             <input type="number" id="pb-flow-rate" min="0" max="100" value="50" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="process-n">PN</label>
+                            <label for="process-n">UN</label>
                             <input id="process-n" type="text" readonly value="0">
                             <label for="pn-flow-rate">%</label>
                             <input type="number" id="pn-flow-rate" min="0" max="100" value="50" step="1" readonly>
                         </div>
 
-                        <!-- Existing System Controls --> 
-                         <div class="input-row">
+                        <!--Processing Pool Data Inputs and Controls -->
+                        <div class="input-row">
                             <label for="pb-loss-rate">PB Loss %</label>
-                            <input type="number" id="pb-loss-rate" min="0" max="100" value="0">
+                            <input type="number" id="pblossrate" min="0" max="100" value="0">
                         </div>
                         <div class="input-row">
-                            <label for="system-net-d">Net D</label>
-                            <input id="system-net-d" type="text" readonly>
+                            <label for="convert-d">PD</label>
+                            <input id="convert-d" type="text" readonly value="0">
+                            <label for="conversion-rate">R</label>
+                            <input type="number" id="conversion-rate" min="0" max="1000" value="10" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="system-converted">Conv D</label>
-                            <input id="system-converted" type="text" readonly>
+                            <label for="convert-b">PB</label>
+                            <input id="convert-b" type="text" readonly value="0">
+                            <label for="cb-flow-rate">%</label>
+                            <input type="number" id="cb-flow-rate" min="0" max="100" value="50" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="loss-rate">D Loss %</label>
-                            <input type="number" id="loss-rate" min="0" max="100" value="0">
+                            <label for="convert-n">PN</label>
+                            <input id="convert-n" type="text" readonly value="0">
+                            <label for="cn-flow-rate">%</label>
+                            <input type="number" id="cn-flow-rate" min="0" max="100" value="50" step="1" readonly>
                         </div>
+                        
+                        <!-- Converted Bytes Pool Inputs and Controls -->
                         <div class="input-row">
-                            <label for="data-reduction">B Convert Rate</label>
-                            <input type="number" 
-                                   id="data-reduction" 
-                                   min="0" 
-                                   max="100" 
-                                   step="0.1">    
-                        </div>
-                        <div class="input-row">
-                            <label for="en-flow-rate">EN Flow</label>
-                            <input type="number" id="en-flow-rate" min="0" max="100" value="0">
-                        </div>
-                        <div class="input-row">
-                            <label for="bits-loss-rate">B Loss %</label>
-                            <input type="number" id="bits-loss-rate" min="0" max="100" value="0">
-                        </div>
-                        <div class="input-row">
-                            <label for="noise-gain-rate">N Gain %</label>
-                            <input type="number" id="noise-gain-rate" min="0" max="100" value="0">
-                        </div>
+                           <label for="cb-loss-%">CB Loss %</label>
+                           <input type="number" id="cb-loss-%" min="0" max="100" value="0">
+                       </div>
+                       <div class="input-row">
+                        <label for="noise-filter-1">NF1</label>
+                        <input type="number" id="noise-filter-1" min="0" max="100" value="0">
+                    </div>
+                       <div class="input-row">
+                           <label for="converted-bytes-d">CD</label>
+                           <input id="converted-bytes-d" type="text" readonly value="0">
+                           <label for="cd-flow-rate">R</label>
+                           <input type="number" id="cd-flow-rate" min="0" max="1000" value="10" step="1">
+                       </div>
+                       <div class="input-row">
+                           <label for="convertedBytes">CB</label>
+                           <input id="convertedBytes" type="text" readonly value="0">
+                           <label for="byte-convert-rate">R</label>
+                            <input type="number" id="byte-convert-rate" min="0" max="100" value="8">
+                       </div>
+                       <div class="input-row">
+                           <label for="convert-step-n">CN</label>
+                           <input id="convert-step-n" type="text" readonly value="0">
+                           <label for="convert-step-n-flow-rate">R</label>
+                           <input type="number" id="convert-step-n-flow-rate" min="0" max="1000" value="10" step="1" readonly>
+                       </div>
                     </div>
                 </div>
 

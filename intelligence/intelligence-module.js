@@ -25,9 +25,26 @@ export class IntelligenceModule {
             totalEntropy: 0
         };
 
-        
+        // Add intelligence toggle listener
+        const intelligenceToggle = document.getElementById('intelligenceToggle');
+        if (intelligenceToggle) {
+            intelligenceToggle.addEventListener('click', () => {
+                this.toggleIntelligence(intelligenceToggle);
+            });
+        }
 
-        
+        // Initialize all system intelligence inputs
+        this.initializeSystemInputs();
+
+        // Initialize clean system state
+        this.generateInitialDataset();
+        this.updateDashboard();
+
+        // Initialize Zero Data button
+        const zeroDataButton = document.getElementById('zeroDataButton');
+        if (zeroDataButton) {
+            zeroDataButton.addEventListener('click', () => this.resetAllData());
+        }
     }
 
     initializeSystemInputs() {
@@ -222,9 +239,33 @@ export class IntelligenceModule {
         }
     }
 
-    
+    // Initialize or Reset System State
+    generateInitialDataset() {
+        console.log('Initializing clean system state...');
+        // Reset all counts
+        this.letterPool = { groups: {}, totalUnprocessed: 0 };
+        this.entropyState = { totalLetters: 0, netLetters: 0, totalWords: 0, totalEntropy: 0, convertedData: 0 };
+        console.log('System initialized with clean state:', this.entropyState);
+    }
 
-    
+    resetAllData() {
+        console.log('Resetting all data to zero...');
+        
+        // Reset all counters
+        this.letterPool = { groups: {}, totalUnprocessed: 0 };
+        this.entropyState = {
+            totalLetters: 0,
+            netLetters: 0,
+            totalWords: 0,
+            totalEntropy: 0,
+            convertedData: 0
+        };
+
+        // Update the dashboard
+        this.updateDashboard();
+
+        console.log('Data reset complete:', this.entropyState);
+    }
 
     // Keep this method for processing EN from EnvironmentModule
     processEN(noise) {

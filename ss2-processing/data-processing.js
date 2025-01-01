@@ -184,7 +184,17 @@ export class DataProcessing {
         this.flowRate = 10;
         this.pbPercent = 50;
         
-        // Add cache for previous values and batch tracking
+        // Add noise mapping
+        this.noiseMap = {
+            'A': 'α', 'B': 'β', 'C': 'γ', 'D': 'δ', 'E': 'ε',
+            'F': 'ζ', 'G': 'η', 'H': 'θ', 'I': 'ι', 'J': 'κ',
+            'K': 'λ', 'L': 'μ', 'M': 'ν', 'N': 'ξ', 'O': 'ο',
+            'P': 'π', 'Q': 'ρ', 'R': 'σ', 'S': 'τ', 'T': 'υ',
+            'U': 'φ', 'V': 'χ', 'W': 'ψ', 'X': 'ω', 'Y': 'ϑ',
+            'Z': 'ϕ'
+        };
+        
+        // Keep existing properties
         this.previousValues = {
             pd: null,
             pb: null,
@@ -195,19 +205,17 @@ export class DataProcessing {
             processedCount: 0,
             lastLogTime: Date.now(),
             BATCH_THRESHOLD: 300,
-            MIN_LOG_INTERVAL: 5000 // Minimum 5 seconds between logs
+            MIN_LOG_INTERVAL: 5000
         };
         
         this.setupControls();
         this.startProcessPoolMonitoring();
-
         this.initializeDashboardElements();
         
         // Listen for store changes
         window.addEventListener('storeChanged', async (event) => {
-            if (event.detail.store === 'processing') {
-                // Update processing inputs immediately when store changes
-                await this.updateProcessingDisplay();
+            if (event.detail.store === 'uptake') {
+                await this.updateUptakeDisplay();
             }
         });
     }
@@ -605,100 +613,52 @@ export class DataProcessing {
 
     async startProcessPoolMonitoring() {
         console.log('Starting process pool monitoring');
+        // Update display immediately
+        await this.updateUptakeDisplay();
         
-        // Initial update
-        await this.updateProcessPoolDisplay();
-
-        // Set up periodic monitoring
+        // Set up monitoring interval
         this.monitoringInterval = setInterval(async () => {
-            await this.updateProcessPoolDisplay();
-        }, 5000); // Update every 5 seconds
+            await this.updateUptakeDisplay();
+        }, 100);
     }
 
-    async updateProcessPoolDisplay() {
+    async updateUptakeDisplay() {
         try {
-            if (!this.environmentDB) {
-                return;
-            }
+            const uptakeData = await this.environmentDB.getUptakeSymbols();
             
-            const processedSymbols = await this.environmentDB.getProcessedSymbols();
+            // Calculate totals
+            let totalBits = 0;
+            let totalNoise = 0;
             
-            if (!processedSymbols || processedSymbols.length === 0) {
-                if (this.previousValues.pd !== 0) {
-                    const pdInput = document.getElementById('process-d');
-                    const pbInput = document.getElementById('process-b');
-                    const pnInput = document.getElementById('process-n');
+            uptakeData.forEach(item => {
+                if (item.type === 'bit') totalBits++;
+                if (item.type === 'noise') totalNoise++;
+            });
+            
+            const totalData = totalBits + totalNoise;
 
-                    if (pdInput) pdInput.value = '0';
-                    if (pbInput) pbInput.value = '0';
-                    if (pnInput) pnInput.value = '0';
-                    
-                    this.previousValues = { pd: 0, pb: 0, pn: 0 };
-                }
-                return;
-            }
+            // Update displays with whole numbers
+            const udInput = document.getElementById('process-d');
+            const ubInput = document.getElementById('process-b');
+            const unInput = document.getElementById('process-n');
 
-            // Count bits and noise
-            const counts = processedSymbols.reduce((acc, symbol) => {
-                if (symbol.type === 'bit') {
-                    acc.bits++;
-                } else if (symbol.type === 'noise') {
-                    acc.noise++;
-                }
-                return acc;
-            }, { bits: 0, noise: 0 });
+            if (udInput) udInput.value = Math.round(totalData);
+            if (ubInput) ubInput.value = Math.round(totalBits);
+            if (unInput) unInput.value = Math.round(totalNoise);
 
-            const totalData = counts.bits + counts.noise;
-
-            // Check if values have changed
-            const hasChanged = 
-                this.previousValues.pd !== totalData ||
-                this.previousValues.pb !== counts.bits ||
-                this.previousValues.pn !== counts.noise;
-
-            if (hasChanged) {
-                // Update displays
-                const pdInput = document.getElementById('process-d');
-                const pbInput = document.getElementById('process-b');
-                const pnInput = document.getElementById('process-n');
-
-                if (pdInput) pdInput.value = Math.round(totalData);
-                if (pbInput) pbInput.value = Math.round(counts.bits);
-                if (pnInput) pnInput.value = Math.round(counts.noise);
-                
-                // Calculate change in processed data
-                const processedDiff = Math.abs((this.previousValues.pd || 0) - totalData);
-                this.batchTracking.processedCount += processedDiff;
-                
-                // Update previous values
-                this.previousValues = {
-                    pd: totalData,
-                    pb: counts.bits,
-                    pn: counts.noise
-                };
-
-                // Check if we should log based on batch threshold and time interval
-                const now = Date.now();
-                if (this.batchTracking.processedCount >= this.batchTracking.BATCH_THRESHOLD &&
-                    (now - this.batchTracking.lastLogTime) >= this.batchTracking.MIN_LOG_INTERVAL) {
-                    
-                    console.log('Process Pool Batch Update:', {
-                        processedSinceLastLog: this.batchTracking.processedCount,
-                        currentTotals: {
-                            pd: totalData,
-                            pb: counts.bits,
-                            pn: counts.noise
-                        },
-                        timeSinceLastLog: `${((now - this.batchTracking.lastLogTime) / 1000).toFixed(1)}s`
-                    });
-
-                    // Reset batch tracking
-                    this.batchTracking.processedCount = 0;
-                    this.batchTracking.lastLogTime = now;
-                }
+            // Increment symbol count and check for batch logging
+            this.symbolCount++;
+            if (this.symbolCount >= this.batchSize) {
+                console.log('Uptake batch report:', {
+                    batchSize: this.batchSize,
+                    totalData,
+                    bits: totalBits,
+                    noise: totalNoise
+                });
+                this.symbolCount = 0; // Reset counter
             }
         } catch (error) {
-            console.error('Error updating process pool display:', error);
+            console.error('Error updating uptake display:', error);
         }
     }
 
@@ -719,6 +679,10 @@ export class DataProcessing {
     destroy() {
         this.cleanup();
     }
+        
+    convertBitToNoise(symbol) {
+        return this.noiseMap[symbol] || 'Ω'; // Default to Omega if no mapping exists
+    }
 
     async processSymbol(symbolData) {
         try {
@@ -732,14 +696,13 @@ export class DataProcessing {
             let finalSymbol = symbolData.symbol;
             
             if (symbolData.type === 'bit' && (Math.random() * 100) < pbLossRate) {
-                // Convert bit to corresponding noise symbol
                 finalType = 'noise';
                 finalSymbol = this.convertBitToNoise(symbolData.symbol);
                 console.log(`Bit ${symbolData.symbol} converted to noise ${finalSymbol} due to PB Loss`);
             }
 
-            // Store the symbol in the processing store
-            await this.environmentDB.storeProcessedSymbol({
+            // Store the symbol in the uptake store
+            await this.environmentDB.storeUptakeSymbol({
                 symbol: finalSymbol,
                 type: finalType,
                 timestamp: Date.now()
@@ -753,7 +716,7 @@ export class DataProcessing {
 
             window.dispatchEvent(new CustomEvent('storeChanged', { 
                 detail: { 
-                    store: 'environment', 
+                    store: 'uptake', 
                     action: 'process',
                     symbolType: finalType 
                 }
@@ -764,36 +727,19 @@ export class DataProcessing {
             console.error('Error processing symbol:', error);
             throw error;
         }
-    }
-
-    // Add conversion method
-    convertBitToNoise(bitSymbol) {
-        // Mapping of English letters to Greek letters
-        const conversionMap = {
-            'A': 'α', 'B': 'β', 'C': 'γ', 'D': 'δ', 'E': 'ε',
-            'F': 'ζ', 'G': 'η', 'H': 'θ', 'I': 'ι', 'J': 'κ',
-            'K': 'λ', 'L': 'μ', 'M': 'ν', 'N': 'ξ', 'O': 'ο',
-            'P': 'π', 'Q': 'ρ', 'R': 'σ', 'S': 'τ', 'T': 'υ',
-            'U': 'φ', 'V': 'χ', 'W': 'ψ', 'X': 'ω', 'Y': 'Ω',
-            'Z': 'Σ', '&': 'ς', '/': 'τ', '+': 'ξ', '∅': 'ψ'
-        };
-
-        // Convert to uppercase to match the map
-        const upperBit = bitSymbol.toUpperCase();
-        
-        // Return the converted symbol or the original if no mapping exists
-        return conversionMap[upperBit] || upperBit;
-    }
+    }    
+    
+    
 
     async updateProcessingDisplay() {
         try {
-            const processedData = await this.environmentDB.getProcessedSymbols();
+            const uptakeData = await this.environmentDB.getUptakeSymbols();
             
             // Calculate totals
             let totalBits = 0;
             let totalNoise = 0;
             
-            processedData.forEach(item => {
+            uptakeData.forEach(item => {
                 if (item.type === 'bit') totalBits++;
                 if (item.type === 'noise') totalNoise++;
             });
@@ -812,6 +758,46 @@ export class DataProcessing {
             }
         } catch (error) {
             console.error('Error updating processing display:', error);
+        }
+    }
+
+    async zeroStores() {
+        const zeroEnvironment = document.getElementById('zero-environment').checked;
+        const zeroProcessing = document.getElementById('zero-processing').checked;
+        const zeroConverted = document.getElementById('zero-converted').checked;
+        const zeroConvBytes = document.getElementById('zero-conv-bytes').checked;
+
+        try {
+            if (zeroEnvironment) {
+                await this.environmentDB.clearStore('environment');
+                console.log('Environment store zeroed');
+            }
+            
+            if (zeroProcessing) {
+                await this.environmentDB.clearStore('uptake');
+                console.log('Uptake store zeroed');
+            }
+            
+            if (zeroConverted) {
+                await this.environmentDB.clearStore('processingPool');
+                console.log('Processing pool store zeroed');
+            }
+
+            if (zeroConvBytes) {
+                await this.environmentDB.clearStore('convertedBytes');
+                console.log('Converted bytes store zeroed');
+            }
+
+            // Trigger display updates
+            window.dispatchEvent(new CustomEvent('storeChanged', { 
+                detail: { 
+                    store: 'all',
+                    action: 'zero'
+                }
+            }));
+
+        } catch (error) {
+            console.error('Error zeroing stores:', error);
         }
     }
 }
