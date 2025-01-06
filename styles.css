@@ -2246,3 +2246,25 @@ input[id*="euler"] {  /* Added Euler Line inputs */
     min-width: 0;
 }
 
+/* Conversion Controls Button Row */
+.data-controls-section .button-row {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    justify-content: flex-start;
+    align-items: center;
+    width: fit-content;
+}
+
+.data-controls-section .button-row .btn {
+    flex: 0 0 auto;  /* Don't allow flex growth/shrink */
+    min-width: 60px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    margin: 0;  /* Reset any existing margins */
+}
+
+.data-controls-section .button-row .btn.active {
+    background-color: #198754 !important;
+    border-color: #198754 !important;
+}

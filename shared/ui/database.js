@@ -13,8 +13,8 @@ export class EnvironmentDatabase {
         }
 
         
-        this.dbName = 'UnifiedTriangleDB';
-        this.version = 2;
+        this.dbName = 'EnvironmentDB';
+        this.version = 5;
         this.ready = this.initializeDatabase();
         this.initializeZeroButton();
 
@@ -24,7 +24,7 @@ export class EnvironmentDatabase {
     async initializeDatabase() {
         try {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('EnvironmentDB', 4);
+                const request = indexedDB.open('EnvironmentDB', 5);
 
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
@@ -80,6 +80,14 @@ export class EnvironmentDatabase {
                     
                     if (!db.objectStoreNames.contains('convertedBytes')) {
                         db.createObjectStore('convertedBytes', { keyPath: 'id', autoIncrement: true });
+                    }
+                    
+                    // Add filteredNoise store
+                    if (!db.objectStoreNames.contains('filteredNoise')) {
+                        db.createObjectStore('filteredNoise', { 
+                            keyPath: 'id', 
+                            autoIncrement: true 
+                        });
                     }
                 };
 
@@ -448,10 +456,7 @@ export class EnvironmentDatabase {
 
     async clearStore(storeName) {
         try {
-            if (!this.#db) {
-                await this.ready;
-            }
-
+            await this.ready;
             const transaction = this.#db.transaction(storeName, 'readwrite');
             const store = transaction.objectStore(storeName);
             
@@ -459,22 +464,16 @@ export class EnvironmentDatabase {
                 const request = store.clear();
                 
                 request.onsuccess = () => {
-                    console.log(`Cleared ${storeName} store`);
-                    // Dispatch custom event
                     window.dispatchEvent(new CustomEvent('storeChanged', { 
                         detail: { store: storeName, action: 'clear' }
                     }));
-                    console.log(`Dispatched 'storeChanged' event for store: ${storeName}`);
                     resolve();
                 };
                 
-                request.onerror = () => {
-                    console.error(`Error clearing ${storeName} store:`, request.error);
-                    reject(request.error);
-                };
+                request.onerror = () => reject(request.error);
             });
         } catch (error) {
-            console.error(`Error in clearStore(${storeName}):`, error);
+            console.error(`Error clearing store ${storeName}:`, error);
             throw error;
         }
     }
@@ -500,22 +499,36 @@ export class EnvironmentDatabase {
         const zeroDataButton = document.getElementById('zeroDataButton');
         if (zeroDataButton) {
             zeroDataButton.addEventListener('click', async () => {
-                const envChecked = document.getElementById('zero-environment').checked;
-                const uptakeChecked = document.getElementById('zero-processing').checked;
-                const convChecked = document.getElementById('zero-converted').checked;
+                try {
+                    // Get checkbox states, with null checks
+                    const envChecked = document.getElementById('zero-environment')?.checked || false;
+                    const uptakeChecked = document.getElementById('zero-processing')?.checked || false;
+                    const convChecked = document.getElementById('zero-converted')?.checked || false;
+                    const convBytesChecked = document.getElementById('zero-conv-bytes')?.checked || false;
 
-                console.log('Zeroing selected stores:', {
-                    environment: envChecked,
-                    uptake: uptakeChecked,
-                    processingPool: convChecked,
-                    convertedBytes: convChecked
-                });
+                    console.log('Zeroing selected stores:', {
+                        environment: envChecked,
+                        uptake: uptakeChecked,
+                        processingPool: convChecked,
+                        convertedBytes: convBytesChecked
+                    });
 
-                if (envChecked) await this.clearStore('environment');
-                if (uptakeChecked) await this.clearStore('uptake');
-                if (convChecked) {
-                    await this.clearStore('processingPool');
-                    await this.clearStore('convertedBytes');
+                    if (envChecked) await this.clearStore('environment');
+                    if (uptakeChecked) await this.clearStore('uptake');
+                    if (convChecked) await this.clearStore('processingPool');
+                    if (convBytesChecked) {
+                        // Clear both convertedBytes and filteredNoise when C is checked
+                        await this.clearStore('convertedBytes');
+                        await this.clearStore('filteredNoise');
+                    }
+
+                    // Dispatch event after clearing
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { store: 'all', action: 'zero' }
+                    }));
+
+                } catch (error) {
+                    console.error('Error zeroing stores:', error);
                 }
             });
         }
@@ -688,6 +701,85 @@ export class EnvironmentDatabase {
             });
         } catch (error) {
             console.error('Error decrementing processing pool noise:', error);
+            throw error;
+        }
+    }
+
+    async storeFilteredNoise(noiseData) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('filteredNoise', 'readwrite');
+            const store = transaction.objectStore('filteredNoise');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.add({
+                    ...noiseData,
+                    timestamp: Date.now()
+                });
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { store: 'filteredNoise', action: 'add', data: noiseData }
+                    }));
+                    resolve(request.result);
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error storing filtered noise:', error);
+            throw error;
+        }
+    }
+
+    async getFilteredNoise() {
+        return this.getAllFromStore('filteredNoise');
+    }
+
+    async deleteFilteredNoise(id) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('filteredNoise', 'readwrite');
+            const store = transaction.objectStore('filteredNoise');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.delete(id);
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { store: 'filteredNoise', action: 'delete', id: id }
+                    }));
+                    resolve();
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error deleting filtered noise:', error);
+            throw error;
+        }
+    }
+
+    async deleteConvertedByte(id) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('convertedBytes', 'readwrite');
+            const store = transaction.objectStore('convertedBytes');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.delete(id);
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { store: 'convertedBytes', action: 'delete', id }
+                    }));
+                    resolve();
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error deleting converted byte:', error);
             throw error;
         }
     }

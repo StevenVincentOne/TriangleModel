@@ -3,11 +3,18 @@ import { environmentDB } from '../shared/ui/database.js';
 export class DataConversion {
     constructor(environmentDB) {
         this.environmentDB = environmentDB;
+        this.byteConversionInterval = null;
+        this.noiseFilterInterval = null;  // Add interval for noise filtering
         this.isConverting = false;
-        this.conversionInterval = null;
-        this.monitoringInterval = null;
+        this.isFiltering = false;  // Add state tracking for filtering
         this.symbolCount = 0;
         this.batchSize = 300;
+        this.lastProcessTime = Date.now();
+        this.lastFilterTime = Date.now();  // Add separate timing for filtering
+        
+        // Initialize flow rate ratios
+        this.currentPbRatio = 50; // Default PB ratio
+        this.currentPnRatio = 50; // Default PN ratio
         
         // Add noise mapping
         this.noiseMap = {
@@ -19,6 +26,7 @@ export class DataConversion {
             'Z': 'ϕ'
         };
         
+        // Initialize all elements and controls
         this.initializeDashboardElements();
         this.initializeControls();
         this.startProcessingMonitoring();
@@ -45,7 +53,7 @@ export class DataConversion {
                 .filter(b => b.type === 'noise')
                 .reduce((sum, b) => sum + (b.count || 1), 0);
 
-            this.updateDisplays(bytesCount, noiseCount);
+            this.updateDisplay({ totalBits: bytesCount, noise: noiseCount });
             
             console.log('Initialized displays with store state:', {
                 bytesCount,
@@ -63,13 +71,17 @@ export class DataConversion {
 
     initializeDashboardElements() {
         this.dashboardElements = {
-            convertData: document.getElementById('convert-d'),
-            convertBytes: document.getElementById('convert-b'),
-            convertNoise: document.getElementById('convert-n'),
+            procpoolData: document.getElementById('procpool-d'),
+            procpoolBytes: document.getElementById('procpool-b'),
+            procpoolNoise: document.getElementById('procpool-n'),
             flowRate: document.getElementById('conversion-rate'),
-            cbFlowRate: document.getElementById('cb-flow-rate'),
-            cnFlowRate: document.getElementById('cn-flow-rate')
+            procbflowrate: document.getElementById('proc-b-flow-rate'),
+            procnflowrate: document.getElementById('proc-n-flow-rate')
         };
+
+        // Initialize flow rate ratios based on default or existing input values
+        this.currentPbRatio = parseInt(this.dashboardElements.procbflowrate?.value) || 50;
+        this.currentPnRatio = parseInt(this.dashboardElements.procnflowrate?.value) || 50;
 
         // Set up flow rate input handler
         if (this.dashboardElements.flowRate) {
@@ -92,34 +104,34 @@ export class DataConversion {
             });
         }
 
-        // Set up linked CB/CN flow rate handlers
-        if (this.dashboardElements.cbFlowRate) {
-            this.dashboardElements.cbFlowRate.addEventListener('input', (e) => {
-                const cbValue = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                const cnValue = 100 - cbValue;
+        // Set up linked PB/PN flow rate handlers
+        if (this.dashboardElements.procbflowrate) {
+            this.dashboardElements.procbflowrate.addEventListener('input', (e) => {
+                const pbValue = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                const pnValue = 100 - pbValue;
                 
                 // Update inputs
-                this.dashboardElements.cbFlowRate.value = cbValue;
-                if (this.dashboardElements.cnFlowRate) {
-                    this.dashboardElements.cnFlowRate.value = cnValue;
+                this.dashboardElements.procbflowrate.value = pbValue;
+                if (this.dashboardElements.procnflowrate) {
+                    this.dashboardElements.procnflowrate.value = pnValue;
                 }
                 
-                console.log('Updated flow rates:', { cb: cbValue, cn: cnValue });
+                console.log('Updated processing flow rates:', { pb: pbValue, pn: pnValue });
             });
         }
 
-        if (this.dashboardElements.cnFlowRate) {
-            this.dashboardElements.cnFlowRate.addEventListener('input', (e) => {
-                const cnValue = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                const cbValue = 100 - cnValue;
+        if (this.dashboardElements.procnflowrate) {
+            this.dashboardElements.procnflowrate.addEventListener('input', (e) => {
+                const pnValue = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                const pbValue = 100 - pnValue;
                 
                 // Update inputs
-                this.dashboardElements.cnFlowRate.value = cnValue;
-                if (this.dashboardElements.cbFlowRate) {
-                    this.dashboardElements.cbFlowRate.value = cbValue;
+                this.dashboardElements.procnflowrate.value = pnValue;
+                if (this.dashboardElements.procbflowrate) {
+                    this.dashboardElements.procbflowrate.value = pbValue;
                 }
                 
-                console.log('Updated flow rates:', { cb: cbValue, cn: cnValue });
+                console.log('Updated processing flow rates:', { pb: pbValue, pn: pnValue });
             });
         }
     }
@@ -143,10 +155,19 @@ export class DataConversion {
             convertBitsButton.addEventListener('click', (e) => {
                 if (this.isByteConverting) {
                     this.stopByteConversion();
-                    e.target.classList.remove('active');
                 } else {
                     this.startByteConversion();
-                    e.target.classList.add('active');
+                }
+            });
+        }
+
+        const filterNoiseButton = document.getElementById('filterNoiseButton');
+        if (filterNoiseButton) {
+            filterNoiseButton.addEventListener('click', () => {
+                if (this.isFiltering) {
+                    this.stopNoiseFiltering();
+                } else {
+                    this.startNoiseFiltering();
                 }
             });
         }
@@ -168,14 +189,14 @@ export class DataConversion {
             const poolCounts = await this.environmentDB.getProcessingPoolCounts();
             
             // Update displays with whole numbers
-            if (this.dashboardElements.convertData) {
-                this.dashboardElements.convertData.value = Math.round(poolCounts.totalBits + poolCounts.noise);
+            if (this.dashboardElements.procpoolData) {
+                this.dashboardElements.procpoolData.value = Math.round(poolCounts.totalBits + poolCounts.noise);
             }
-            if (this.dashboardElements.convertBytes) {
-                this.dashboardElements.convertBytes.value = Math.round(poolCounts.totalBits);
+            if (this.dashboardElements.procpoolBytes) {
+                this.dashboardElements.procpoolBytes.value = Math.round(poolCounts.totalBits);
             }
-            if (this.dashboardElements.convertNoise) {
-                this.dashboardElements.convertNoise.value = Math.round(poolCounts.noise);
+            if (this.dashboardElements.procpoolNoise) {
+                this.dashboardElements.procpoolNoise.value = Math.round(poolCounts.noise);
             }
 
             // Batch logging
@@ -227,7 +248,7 @@ export class DataConversion {
                 }
 
                 const symbol = uptakeData[0];
-                const pbLossRateInput = document.getElementById('pblossrate');
+                const pbLossRateInput = document.getElementById('pb-loss-rate');
                 const pbLossRate = parseInt(pbLossRateInput?.value) || 0;
                 
                 // Debug logging
@@ -285,220 +306,413 @@ export class DataConversion {
     }
 
     startByteConversion() {
+        if (this.isConverting || this.byteConversionInterval) {
+            console.log('Conversion already running, stopping first');
+            this.stopByteConversion();
+            return;
+        }
+
         console.log('Starting byte conversion process');
-        this.isByteConverting = true;
+        this.isConverting = true;
         
-        // Start monitoring interval
+        // Update button state
+        const convertButton = document.getElementById('convertBitsButton');
+        if (convertButton) {
+            convertButton.classList.add('active');
+        }
+
+        this.lastProcessTime = Date.now();
+        
         this.byteConversionInterval = setInterval(async () => {
             try {
-                // Get current processing pool state and noise filter rate
+                // Get flow rate and loss rate
+                const flowRateInput = document.getElementById('converted-bytes-flow-rate');
+                const cbLossRateInput = document.getElementById('cb-loss-%');
+                
+                if (!flowRateInput) {
+                    throw new Error('Missing converted-bytes-flow-rate input');
+                }
+
+                const now = Date.now();
+                const deltaTime = now - this.lastProcessTime;
+                const convertRate = parseInt(flowRateInput.value) || 10;
+                const cbLossRate = parseInt(cbLossRateInput?.value) || 0;
+                const symbolsToProcess = Math.floor(convertRate * (deltaTime / 1000));
+
+                if (symbolsToProcess < 1) {
+                    return;
+                }
+
+                this.lastProcessTime = now;
+                const bitsPerByte = 8;
                 const poolCounts = await this.environmentDB.getProcessingPoolCounts();
-                const noiseFilter = parseInt(document.getElementById('noise-filter-1').value) || 0;
-                const cdFlowRate = parseInt(document.getElementById('cd-flow-rate').value) || 10;
-                
-                // Process bits to bytes
-                const byteRate = parseInt(document.getElementById('byte-convert-rate').value) || 8;
-                
-                // Handle bits conversion
-                for (const [symbol, count] of Object.entries(poolCounts.bits)) {
-                    if (count >= byteRate) {
-                        const bytesToCreate = Math.floor(count / byteRate);
-                        const bitsToRemove = bytesToCreate * byteRate;
-                        
-                        // Remove bits from processing pool
-                        await this.environmentDB.decrementProcessingPoolBits(symbol, bitsToRemove);
-                        
-                        // Add bytes to converted bytes pool
-                        await this.environmentDB.storeConvertedBytes({
-                            symbol: symbol,
-                            type: 'byte',
-                            count: bytesToCreate,
-                            timestamp: Date.now()
-                        });
+
+                let processedThisCycle = 0;
+                let batchReport = [];
+
+                if (poolCounts && poolCounts.bits && Object.keys(poolCounts.bits).length > 0) {
+                    console.log('Processing pool bits:', poolCounts.bits);
+                    
+                    for (const [symbol, count] of Object.entries(poolCounts.bits)) {
+                        if (processedThisCycle >= symbolsToProcess) break;
+
+                        if (count >= bitsPerByte) {
+                            const bytesToCreate = Math.min(
+                                Math.floor(count / bitsPerByte),
+                                symbolsToProcess - processedThisCycle
+                            );
+
+                            if (bytesToCreate > 0) {
+                                const bitsToRemove = bytesToCreate * bitsPerByte;
+                                await this.environmentDB.decrementProcessingPoolBits(symbol, bitsToRemove);
+
+                                // Apply CB Loss % - determine how many bytes become noise
+                                const bytesLost = Math.floor(bytesToCreate * (cbLossRate / 100));
+                                const bytesPreserved = bytesToCreate - bytesLost;
+
+                                // Store preserved bytes
+                                if (bytesPreserved > 0) {
+                                    await this.environmentDB.storeConvertedBytes({
+                                        symbol: symbol,
+                                        type: 'byte',
+                                        count: bytesPreserved,
+                                        timestamp: Date.now()
+                                    });
+                                }
+
+                                // Store lost bytes as noise in filteredNoise store
+                                if (bytesLost > 0) {
+                                    await this.environmentDB.storeFilteredNoise({
+                                        symbol: this.convertBitToNoise(symbol),
+                                        type: 'noise',
+                                        count: bytesLost,
+                                        timestamp: Date.now()
+                                    });
+                                }
+
+                                processedThisCycle += bytesToCreate;
+                                
+                                batchReport.push({
+                                    symbol,
+                                    bytesCreated: bytesToCreate,
+                                    bytesPreserved,
+                                    bytesLost,
+                                    bitsRemoved: bitsToRemove,
+                                    lossRate: cbLossRate
+                                });
+                            }
+                        }
                     }
                 }
 
-                // Handle noise transfer with noise filtering
-                const processingPool = await this.environmentDB.getProcessingPool();
-                const noiseSymbols = processingPool.filter(item => item.type === 'noise');
-                
-                for (const noiseSymbol of noiseSymbols) {
-                    // Apply CD flow rate and noise filter
-                    if (Math.random() * 1000 < cdFlowRate && Math.random() * 100 >= noiseFilter) {
-                        // Transfer noise to converted bytes store
-                        await this.environmentDB.storeConvertedBytes({
-                            symbol: noiseSymbol.symbol,
-                            type: 'noise',
-                            count: 1,
-                            timestamp: Date.now()
-                        });
-                        
-                        // Remove from processing pool
-                        await this.environmentDB.decrementProcessingPoolNoise(noiseSymbol.symbol, 1);
-                    }
+                if (batchReport.length > 0) {
+                    console.log('Batch conversion report:', {
+                        processedThisCycle,
+                        conversions: batchReport,
+                        flowRate: convertRate,
+                        lossRate: cbLossRate
+                    });
+                    
+                    const updatedPoolCounts = await this.environmentDB.getProcessingPoolCounts();
+                    await this.updateDisplay(updatedPoolCounts);
                 }
 
-                // Update displays with fresh data
-                const convertedBytes = await this.environmentDB.getConvertedBytes();
-                const bytesCount = convertedBytes
-                    .filter(b => b.type === 'byte')
-                    .reduce((sum, b) => sum + (b.count || 1), 0);
-                const noiseCount = convertedBytes
-                    .filter(b => b.type === 'noise')
-                    .reduce((sum, b) => sum + (b.count || 1), 0);
-
-                this.updateDisplays(bytesCount, noiseCount);
-                
             } catch (error) {
                 console.error('Error in byte conversion interval:', error);
                 this.stopByteConversion();
             }
-        }, 100);
-    }
-
-    updateDisplays(bytesCount, noiseCount) {
-        // Get the elements directly each time to ensure we have the latest references
-        const cdElement = document.getElementById('converted-bytes-d');
-        const cbElement = document.getElementById('convertedBytes');
-        const cnElement = document.getElementById('convert-step-n');
-
-        if (cdElement) {
-            cdElement.value = bytesCount + noiseCount;
-        }
-        if (cbElement) {
-            cbElement.value = bytesCount;
-        }
-        if (cnElement) {
-            cnElement.value = noiseCount;
-        }
-
-        console.log('Display values updated:', {
-            CD: cdElement?.value,
-            CB: cbElement?.value,
-            CN: cnElement?.value,
-            rawValues: {
-                bytes: bytesCount,
-                noise: noiseCount,
-                total: bytesCount + noiseCount
-            }
-        });
+        }, 50);
     }
 
     stopByteConversion() {
-        console.log('Stopping byte conversion process');
+        console.log('Stopping byte conversion process', {
+            hadInterval: !!this.byteConversionInterval,
+            wasConverting: this.isConverting
+        });
+
+        // Clear the interval
         if (this.byteConversionInterval) {
             clearInterval(this.byteConversionInterval);
             this.byteConversionInterval = null;
         }
-        this.isByteConverting = false;
+
+        // Reset state and button appearance
+        this.isConverting = false;
+        const convertButton = document.getElementById('convertBitsButton');
+        if (convertButton) {
+            convertButton.classList.remove('active');
+        }
+    }
+
+    async updateDisplay(poolCounts) {
+        try {
+            // Update Processing Pool displays
+            if (poolCounts) {
+                const processingPoolDisplays = {
+                    'procpool-d': Math.round(poolCounts.totalBits + poolCounts.noise).toString(),
+                    'procpool-b': Math.round(poolCounts.totalBits * (this.currentPbRatio / 100)).toString(),
+                    'procpool-n': Math.round(poolCounts.noise * (this.currentPnRatio / 100)).toString()
+                };
+
+                Object.entries(processingPoolDisplays).forEach(([id, value]) => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.value = value;
+                    }
+                });
+            }
+
+            // Update Converted Bytes display
+            const convertedBytes = await this.environmentDB.getConvertedBytes();
+            const bytesCount = convertedBytes
+                .filter(b => b.type === 'byte')
+                .reduce((sum, b) => sum + (b.count || 1), 0);
+            
+            const cbDisplay = document.getElementById('convertedBytes');
+            if (cbDisplay) {
+                cbDisplay.value = bytesCount.toString();
+            }
+
+            // Update Converted Noise (CN) display
+            const filteredNoise = await this.environmentDB.getFilteredNoise();
+            const noiseCount = filteredNoise
+                .filter(n => n.type === 'noise')
+                .reduce((sum, n) => sum + (n.count || 1), 0);
+            
+            const cnDisplay = document.getElementById('convert-step-n');
+            if (cnDisplay) {
+                cnDisplay.value = noiseCount.toString();
+            }
+
+            // Log current state
+            console.log('Display State:', {
+                convertedBytes: bytesCount,
+                convertedNoise: noiseCount
+            });
+
+        } catch (error) {
+            console.error('Error updating displays:', error);
+        }
+    }
+
+    setupEventListeners() {
+        const convertButton = document.getElementById('convertBitsButton');
+        if (convertButton) {
+            let debounceTimeout = null;
+            convertButton.addEventListener('click', () => {
+                if (debounceTimeout) return; // Ignore if debounce is active
+
+                debounceTimeout = setTimeout(() => {
+                    debounceTimeout = null;
+                }, 300); // 300ms debounce
+
+                console.log('Convert button clicked, current state:', {
+                    isConverting: this.isConverting,
+                    hasInterval: !!this.byteConversionInterval
+                });
+
+                if (this.isConverting) {
+                    this.stopByteConversion();
+                } else {
+                    this.startByteConversion();
+                }
+            });
+        }
     }
 
     async clearConvertedBytes() {
         try {
+            console.log('Clearing converted bytes...');
             await this.environmentDB.clearStore('convertedBytes');
-            console.log('Cleared convertedBytes store');
+            console.log('Converted bytes cleared successfully');
             
-            // Update displays with zeroed values
+            // Update displays after clearing
             const poolCounts = await this.environmentDB.getProcessingPoolCounts();
-            const convertedBytes = await this.environmentDB.getConvertedBytes();
-            this.updateDisplays(0, 0);
-            
-            // Trigger store changed event
-            window.dispatchEvent(new CustomEvent('storeChanged', { 
-                detail: { 
-                    store: 'convertedBytes',
-                    action: 'clear'
-                }
-            }));
+            await this.updateDisplay(poolCounts);
         } catch (error) {
-            console.error('Error clearing convertedBytes store:', error);
+            console.error('Error clearing converted bytes:', error);
         }
     }
 
-    async processConversion() {
+    async filterNoise() {
         try {
-            // Get current processing pool state and noise filter rate
-            const poolCounts = await this.environmentDB.getProcessingPoolCounts();
-            const noiseFilter = parseInt(document.getElementById('noise-filter-1').value) || 0;
-            const cdFlowRate = parseInt(document.getElementById('cd-flow-rate').value) || 10;
-            const byteRate = parseInt(document.getElementById('byte-convert-rate').value) || 8;
+            // Get flow rate and filter rate
+            const flowRateInput = document.getElementById('convert-step-n-flow-rate');
+            const filterRateInput = document.getElementById('noise-filter-1');
             
-            // Process bits to bytes
-            for (const [symbol, count] of Object.entries(poolCounts.bits)) {
-                if (count >= byteRate) {
-                    const bytesToCreate = Math.floor(count / byteRate);
-                    const bitsToRemove = bytesToCreate * byteRate;
-                    
-                    // Remove bits from processing pool
-                    const decremented = await this.environmentDB.decrementProcessingPoolBits(symbol, bitsToRemove);
-                    
-                    if (decremented) {
-                        await this.environmentDB.storeConvertedBytes({
-                            symbol: symbol,
-                            type: 'byte',
-                            count: bytesToCreate,
-                            timestamp: Date.now()
-                        });
-                    }
-                }
+            if (!flowRateInput) {
+                throw new Error('Missing convert-step-n-flow-rate input');
             }
 
-            // Handle noise transfer with noise filtering
-            if (poolCounts.noise > 0) {
-                // Get all items from processing pool
-                const processingPool = await this.environmentDB.getProcessingPool();
-                // Filter for noise items
-                const noiseSymbols = processingPool.filter(item => item.type === 'noise');
+            const now = Date.now();
+            const deltaTime = now - this.lastProcessTime;
+            const flowRate = parseInt(flowRateInput.value) || 10;
+            const filterRate = parseInt(filterRateInput?.value) || 0;
+            const symbolsToProcess = Math.floor(flowRate * (deltaTime / 1000));
+
+            if (symbolsToProcess < 1) {
+                return;
+            }
+
+            this.lastProcessTime = now;
+
+            // Get all symbols from processing pool
+            const poolSymbols = await this.environmentDB.getProcessingPool();
+            
+            // Filter out noise symbols
+            const noiseSymbols = poolSymbols.filter(symbol => symbol.type === 'noise');
+            
+            let processedThisCycle = 0;
+            let batchReport = [];
+
+            // Process each noise symbol
+            for (const noiseSymbol of noiseSymbols) {
+                if (processedThisCycle >= symbolsToProcess) break;
+
+                // Apply NF1 filter rate
+                const symbolsToFilter = Math.min(
+                    Math.floor(noiseSymbol.count * (filterRate / 100)),
+                    symbolsToProcess - processedThisCycle
+                );
+
+                if (symbolsToFilter > 0) {
+                    // Store in filteredNoise with type descriptor
+                    await this.environmentDB.storeFilteredNoise({
+                        symbol: noiseSymbol.symbol,
+                        type: 'noise',
+                        count: symbolsToFilter,
+                        originalTimestamp: noiseSymbol.timestamp
+                    });
+                    
+                    // Remove from processing pool
+                    await this.environmentDB.decrementProcessingPoolNoise(noiseSymbol.symbol, symbolsToFilter);
+
+                    processedThisCycle += symbolsToFilter;
+                    
+                    batchReport.push({
+                        symbol: noiseSymbol.symbol,
+                        filtered: symbolsToFilter,
+                        remaining: noiseSymbol.count - symbolsToFilter
+                    });
+                }
+            }
+            
+            if (batchReport.length > 0) {
+                console.log('Noise filtering report:', {
+                    processedThisCycle,
+                    flowRate,
+                    filterRate,
+                    filters: batchReport
+                });
                 
+                // Update displays after filtering
+                const poolCounts = await this.environmentDB.getProcessingPoolCounts();
+                await this.updateDisplay(poolCounts);
+            }
+            
+        } catch (error) {
+            console.error('Error filtering noise:', error);
+        }
+    }
+
+    startNoiseFiltering() {
+        if (this.isFiltering || this.noiseFilterInterval) {
+            console.log('Filtering already running, stopping first');
+            this.stopNoiseFiltering();
+            return;
+        }
+
+        console.log('Starting noise filtering process');
+        this.isFiltering = true;
+        
+        // Update button state
+        const filterButton = document.getElementById('filterNoiseButton');
+        if (filterButton) {
+            filterButton.classList.add('active');
+        }
+
+        this.lastFilterTime = Date.now();
+        
+        this.noiseFilterInterval = setInterval(async () => {
+            try {
+                const flowRateInput = document.getElementById('convert-step-n-flow-rate');
+                const filterRateInput = document.getElementById('noise-filter-1');
+                
+                const now = Date.now();
+                const deltaTime = now - this.lastFilterTime;
+                const flowRate = parseInt(flowRateInput?.value) || 10;
+                const filterRate = parseInt(filterRateInput?.value) || 0;
+                const symbolsToProcess = Math.floor(flowRate * (deltaTime / 1000));
+
+                if (symbolsToProcess < 1) {
+                    return;
+                }
+
+                this.lastFilterTime = now;
+
+                // Get noise symbols from processing pool
+                const poolSymbols = await this.environmentDB.getProcessingPool();
+                const noiseSymbols = poolSymbols.filter(symbol => symbol.type === 'noise');
+                
+                let processedThisCycle = 0;
+                let batchReport = [];
+
                 for (const noiseSymbol of noiseSymbols) {
-                    // Apply CD flow rate and noise filter
-                    if (Math.random() * 1000 < cdFlowRate && Math.random() * 100 >= noiseFilter) {
-                        // Transfer noise to converted bytes store
-                        await this.environmentDB.storeConvertedBytes({
+                    if (processedThisCycle >= symbolsToProcess) break;
+
+                    const symbolsToFilter = Math.min(
+                        Math.floor(noiseSymbol.count * (filterRate / 100)),
+                        symbolsToProcess - processedThisCycle
+                    );
+
+                    if (symbolsToFilter > 0) {
+                        await this.environmentDB.storeFilteredNoise({
                             symbol: noiseSymbol.symbol,
                             type: 'noise',
-                            count: 1,
-                            timestamp: Date.now()
+                            count: symbolsToFilter,
+                            originalTimestamp: noiseSymbol.timestamp
                         });
                         
-                        // Remove from processing pool
-                        await this.environmentDB.decrementProcessingPoolNoise(noiseSymbol.symbol, 1);
+                        await this.environmentDB.decrementProcessingPoolNoise(noiseSymbol.symbol, symbolsToFilter);
+                        processedThisCycle += symbolsToFilter;
+                        
+                        batchReport.push({
+                            symbol: noiseSymbol.symbol,
+                            filtered: symbolsToFilter,
+                            remaining: noiseSymbol.count - symbolsToFilter
+                        });
                     }
                 }
-            }
 
-            // Get current state and update displays
-            const convertedBytes = await this.environmentDB.getConvertedBytes();
-            
-            // Calculate totals
-            const bytesCount = convertedBytes
-                .filter(b => b.type === 'byte')
-                .reduce((sum, b) => sum + (b.count || 1), 0);
-                
-            const noiseCount = convertedBytes
-                .filter(b => b.type === 'noise')
-                .reduce((sum, b) => sum + (b.count || 1), 0);
-            
-            // Update displays with CB + CN = CD logic
-            if (this.dashboardElements.convertData) {
-                this.dashboardElements.convertData.value = bytesCount + noiseCount;
-            }
-            if (this.dashboardElements.convertBytes) {
-                this.dashboardElements.convertBytes.value = bytesCount;
-            }
-            if (this.dashboardElements.convertNoise) {
-                this.dashboardElements.convertNoise.value = noiseCount;
-            }
+                if (batchReport.length > 0) {
+                    console.log('Noise filtering report:', {
+                        processedThisCycle,
+                        flowRate,
+                        filterRate,
+                        filters: batchReport
+                    });
+                    
+                    const poolCounts = await this.environmentDB.getProcessingPoolCounts();
+                    await this.updateDisplay(poolCounts);
+                }
 
-            console.log('Conversion stats:', {
-                totalData: bytesCount + noiseCount,
-                bytes: bytesCount,
-                noise: noiseCount,
-                convertedBytes: convertedBytes
-            });
+            } catch (error) {
+                console.error('Error in noise filtering interval:', error);
+                this.stopNoiseFiltering();
+            }
+        }, 50); // Check every 50ms for smooth updates
+    }
 
-        } catch (error) {
-            console.error('Error in processConversion:', error);
+    stopNoiseFiltering() {
+        if (this.noiseFilterInterval) {
+            clearInterval(this.noiseFilterInterval);
+            this.noiseFilterInterval = null;
+        }
+        this.isFiltering = false;
+        
+        const filterButton = document.getElementById('filterNoiseButton');
+        if (filterButton) {
+            filterButton.classList.remove('active');
         }
     }
 }

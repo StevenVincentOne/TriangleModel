@@ -7,10 +7,10 @@ export class CapacityModule {
         this.symbolPool = {
             bits: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J',
                 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
-                'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '/', '+', '&', '∅'],
-            noise: ['α', 'β', 'χ', 'δ', 'ε', 'φ', 'γ', 'η', 'ι', 'ξ',
-                'κ', 'λ', 'μ', 'ν', 'ο', 'π', 'ψ', 'ρ', 'σ',
-                'τ', 'υ', 'ϑ', 'ω', 'χ', 'ψ', 'ζ', 'ς', 'Σ', 'Ω', 'θ']
+                'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '∅'],
+            noise: ['α', 'β', 'ς', 'δ', 'ε', 'φ', 'γ', 'η', 'ι', 'ξ',
+                'κ', 'λ', 'μ', 'ν', 'ο', 'π', 'ϱ', 'ρ', 'σ',
+                'τ', 'υ', 'ϑ', 'ω', 'χ', 'ψ', 'ζ', 'θ']
         };
         this.environmentDB = environmentDB;
         this.currentDashboardData = null;
@@ -30,13 +30,15 @@ export class CapacityModule {
         
         if (ebPercentInput && enPercentInput) {
             ebPercentInput.addEventListener('input', () => {
-                const ebPercent = parseInt(ebPercentInput.value) || 0;
+                const ebPercent = Math.min(Math.max(parseInt(ebPercentInput.value) || 0, 0), 100);
+                ebPercentInput.value = ebPercent;
                 enPercentInput.value = 100 - ebPercent;
                 this.updateBitsNoiseDistribution();
             });
 
             enPercentInput.addEventListener('input', () => {
-                const enPercent = parseInt(enPercentInput.value) || 0;
+                const enPercent = Math.min(Math.max(parseInt(enPercentInput.value) || 0, 0), 100);
+                enPercentInput.value = enPercent;
                 ebPercentInput.value = 100 - enPercent;
                 this.updateBitsNoiseDistribution();
             });

@@ -175,7 +175,6 @@
                         <div class="button-row">
                             <button id="processDataButton" class="btn">Uptake</button>
                             <button id="letterFlowToggle" class="btn">Pool</button>
-                            <button id="convertBitsButton" class="btn">Convert</button>
                         </div>
                     </div>
                     <!-- System Internal Data Controls -->
@@ -204,7 +203,7 @@
                         <!-- Uptake Pool Inputs and Controls -->
                          <div class="input-row">
                             <label for="pb-loss-rate">UB Loss %</label>
-                            <input type="number" id="pb-loss-rate" min="0" max="100" value="0">
+                            <input type="number" id="uptake-loss-%" min="0" max="100" value="0">
                         </div>
                         <div class="input-row">
                             <label for="process-d">UD</label>
@@ -228,54 +227,62 @@
                         <!--Processing Pool Data Inputs and Controls -->
                         <div class="input-row">
                             <label for="pb-loss-rate">PB Loss %</label>
-                            <input type="number" id="pblossrate" min="0" max="100" value="0">
+                            <input type="number" id="pb-loss-rate" min="0" max="100" value="0">
                         </div>
                         <div class="input-row">
-                            <label for="convert-d">PD</label>
-                            <input id="convert-d" type="text" readonly value="0">
+                            <label for="procpool-d">PD</label>
+                            <input id="procpool-d" type="text" readonly value="0">
                             <label for="conversion-rate">R</label>
                             <input type="number" id="conversion-rate" min="0" max="1000" value="10" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="convert-b">PB</label>
-                            <input id="convert-b" type="text" readonly value="0">
-                            <label for="cb-flow-rate">%</label>
-                            <input type="number" id="cb-flow-rate" min="0" max="100" value="50" step="1">
+                            <label for="procpool-b">PB</label>
+                            <input id="procpool-b" type="text" readonly value="0">
+                            <label for="proc-b-flow-rate">%</label>
+                            <input type="number" id="proc-b-flow-rate" min="0" max="100" value="50" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="convert-n">PN</label>
-                            <input id="convert-n" type="text" readonly value="0">
-                            <label for="cn-flow-rate">%</label>
-                            <input type="number" id="cn-flow-rate" min="0" max="100" value="50" step="1" readonly>
+                            <label for="procpool-n">PN</label>
+                            <input id="procpool-n" type="text" readonly value="0">
+                            <label for="proc-n-flow-rate">%</label>
+                            <input type="number" id="proc-n-flow-rate" min="0" max="100" value="50" step="1">
                         </div>
                         
+                        <!-- Convert and Filter Buttons with Controls -->
+                         <div class="input-row">
+                            <label for="cb-loss-%">CB Loss %</label>
+                            <input type="number" id="cb-loss-%" min="0" max="100" value="0">
+                        </div>
+                        <div class="button-row intelligence-controls" style="display: flex; gap: 2px; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <button id="convertBitsButton" class="btn">Convert</button>
+                                <label for="byte-convert-rate">Rate</label>
+                                <input type="number" id="byte-convert-rate" min="0" max="100" value="8" 
+                                    style="width: 40px; text-align: center;">
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <button id="filterNoiseButton" class="btn">Filter</button>
+                                <label for="noise-filter-1">NF1</label>
+                                <input type="number" id="noise-filter-1" min="0" max="100" value="0" 
+                                    style="width: 40px; text-align: center;">
+                            </div>
+                        </div>
+
                         <!-- Converted Bytes Pool Inputs and Controls -->
                         <div class="input-row">
-                           <label for="cb-loss-%">CB Loss %</label>
-                           <input type="number" id="cb-loss-%" min="0" max="100" value="0">
-                       </div>
-                       <div class="input-row">
-                        <label for="noise-filter-1">NF1</label>
-                        <input type="number" id="noise-filter-1" min="0" max="100" value="0">
-                    </div>
-                       <div class="input-row">
-                           <label for="converted-bytes-d">CD</label>
-                           <input id="converted-bytes-d" type="text" readonly value="0">
-                           <label for="cd-flow-rate">R</label>
-                           <input type="number" id="cd-flow-rate" min="0" max="1000" value="10" step="1">
-                       </div>
-                       <div class="input-row">
-                           <label for="convertedBytes">CB</label>
-                           <input id="convertedBytes" type="text" readonly value="0">
-                           <label for="byte-convert-rate">R</label>
-                            <input type="number" id="byte-convert-rate" min="0" max="100" value="8">
-                       </div>
-                       <div class="input-row">
-                           <label for="convert-step-n">CN</label>
-                           <input id="convert-step-n" type="text" readonly value="0">
-                           <label for="convert-step-n-flow-rate">R</label>
-                           <input type="number" id="convert-step-n-flow-rate" min="0" max="1000" value="10" step="1" readonly>
-                       </div>
+                            <label for="convertedBytes">CB</label>
+                            <input id="convertedBytes" type="text" readonly value="0">
+                            <label for="converted-bytes-flow-rate">R</label>
+                            <input type="number" id="converted-bytes-flow-rate" min="0" max="1000" value="10" step="1">
+                        </div>
+                        <!-- Filtered Noise Inputs and Controls -->
+                        <div class="input-row">
+                            <label for="convert-step-n">CN</label>
+                            <input id="convert-step-n" type="text" readonly value="0">
+                            <label for="convert-step-n-flow-rate">R</label>
+                            <input type="number" id="convert-step-n-flow-rate" min="0" max="1000" value="10" step="1">
+                        </div>
+
                     </div>
                 </div>
 

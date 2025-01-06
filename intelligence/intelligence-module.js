@@ -40,11 +40,7 @@ export class IntelligenceModule {
         this.generateInitialDataset();
         this.updateDashboard();
 
-        // Initialize Zero Data button
-        const zeroDataButton = document.getElementById('zeroDataButton');
-        if (zeroDataButton) {
-            zeroDataButton.addEventListener('click', () => this.resetAllData());
-        }
+        
     }
 
     initializeSystemInputs() {

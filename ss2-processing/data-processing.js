@@ -688,17 +688,17 @@ export class DataProcessing {
         try {
             console.log('Processing symbol data:', symbolData);
             
-            // Get PB Loss rate
-            const pbLossRate = parseInt(document.getElementById('pb-loss-rate').value) || 0;
+            // Get UB Loss rate (updated ID)
+            const ubLossRate = parseInt(document.getElementById('uptake-loss-%').value) || 0;
             
             // Determine if bit should be converted to noise
             let finalType = symbolData.type;
             let finalSymbol = symbolData.symbol;
             
-            if (symbolData.type === 'bit' && (Math.random() * 100) < pbLossRate) {
+            if (symbolData.type === 'bit' && (Math.random() * 100) < ubLossRate) {
                 finalType = 'noise';
                 finalSymbol = this.convertBitToNoise(symbolData.symbol);
-                console.log(`Bit ${symbolData.symbol} converted to noise ${finalSymbol} due to PB Loss`);
+                console.log(`Bit ${symbolData.symbol} converted to noise ${finalSymbol} due to UB Loss`);
             }
 
             // Store the symbol in the uptake store
@@ -783,6 +783,7 @@ export class DataProcessing {
                 console.log('Processing pool store zeroed');
             }
 
+            // Separate check for convertedBytes store
             if (zeroConvBytes) {
                 await this.environmentDB.clearStore('convertedBytes');
                 console.log('Converted bytes store zeroed');
