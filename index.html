@@ -252,30 +252,36 @@
                          <div class="input-row">
                             <label for="cb-loss-%">CB Loss %</label>
                             <input type="number" id="cb-loss-%" min="0" max="100" value="0">
-                        </div>
-                        <div class="button-row intelligence-controls" style="display: flex; gap: 2px; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 2px;">
-                                <button id="convertBitsButton" class="btn">Convert</button>
-                                <label for="byte-convert-rate">Rate</label>
-                                <input type="number" id="byte-convert-rate" min="0" max="100" value="8" 
-                                    style="width: 40px; text-align: center;">
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 2px;">
-                                <button id="filterNoiseButton" class="btn">Filter</button>
+                        </div><div style="display: flex; align-items: center; gap: 2px;">
                                 <label for="noise-filter-1">NF1</label>
                                 <input type="number" id="noise-filter-1" min="0" max="100" value="0" 
                                     style="width: 40px; text-align: center;">
                             </div>
+                        <div class="button-row intelligence-controls" style="display: flex; gap: 2px; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 2px;">
+                                <button id="convertBitsButton" class="btn">Convert</button>
+                                <label for="byte-convert-rate">BR</label>
+                                <input type="number" id="byte-convert-rate" min="0" max="100" value="8" 
+                                    style="width: 40px; text-align: center;">
+                                <label for="entropy-convert-rate">ER</label>
+                                <input type="number" id="entropy-convert-rate" min="0" max="100" value="8" 
+                                    style="width: 40px; text-align: center;">
+                            </div>
                         </div>
 
-                        <!-- Converted Bytes Pool Inputs and Controls -->
+                        <!-- Converted Bytes, Entropy, Noise Inputs and Controls -->
                         <div class="input-row">
                             <label for="convertedBytes">CB</label>
                             <input id="convertedBytes" type="text" readonly value="0">
                             <label for="converted-bytes-flow-rate">R</label>
                             <input type="number" id="converted-bytes-flow-rate" min="0" max="1000" value="10" step="1">
                         </div>
-                        <!-- Filtered Noise Inputs and Controls -->
+                        <div class="input-row">
+                            <label for="convertedEntropy">CE</label>
+                            <input id="convertedEntropy" type="text" readonly value="0">
+                            <label for="converted-entropy-flow-rate">R</label>
+                            <input type="number" id="converted-bytes-flow-rate" min="0" max="1000" value="10" step="1">
+                        </div>
                         <div class="input-row">
                             <label for="convert-step-n">CN</label>
                             <input id="convert-step-n" type="text" readonly value="0">
@@ -283,6 +289,13 @@
                             <input type="number" id="convert-step-n-flow-rate" min="0" max="1000" value="10" step="1">
                         </div>
 
+                        <!-- Noise Recycle Controls -->
+                        <div class="button-row intelligence-controls" style="display: flex; flex-direction: row; gap: 2px; align-items: center;">
+                            <button id="recycleNoiseButton" class="btn">Recycle</button>
+                            <label for="noise-recycle-rate">Rate</label>
+                            <input type="number" id="noise-recycle-rate" min="0" max="100" value="10" 
+                                style="width: 40px; text-align: center;">
+                        </div>
                     </div>
                 </div>
 

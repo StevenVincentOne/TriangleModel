@@ -346,6 +346,13 @@ export class EnvironmentDatabase {
                     if (this.debugLogging) {
                         console.log('Stored environment symbol:', symbolData);
                     }
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { 
+                            store: 'environment', 
+                            action: 'add', 
+                            data: symbolData 
+                        }
+                    }));
                     resolve(request.result);
                 };
 
@@ -398,7 +405,14 @@ export class EnvironmentDatabase {
             const transaction = this.#db.transaction('environment', 'readwrite');
             const store = transaction.objectStore('environment');
 
-            // If poolData is an array, store each item
+            // First clear the existing data
+            await new Promise((resolve, reject) => {
+                const clearRequest = store.clear();
+                clearRequest.onsuccess = () => resolve();
+                clearRequest.onerror = () => reject(clearRequest.error);
+            });
+
+            // Then store the new data
             if (Array.isArray(poolData)) {
                 for (const item of poolData) {
                     await new Promise((resolve, reject) => {
@@ -408,7 +422,6 @@ export class EnvironmentDatabase {
                     });
                 }
             } else {
-                // If poolData is a single item
                 const request = store.add(poolData);
                 await new Promise((resolve, reject) => {
                     request.onsuccess = () => resolve();
@@ -440,6 +453,13 @@ export class EnvironmentDatabase {
                 
                 request.onsuccess = () => {
                     console.log('Successfully deleted symbol with ID:', id);
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { 
+                            store: 'environment', 
+                            action: 'delete', 
+                            id: id 
+                        }
+                    }));
                     resolve();
                 };
         
@@ -782,6 +802,186 @@ export class EnvironmentDatabase {
             console.error('Error deleting converted byte:', error);
             throw error;
         }
+    }
+
+    async monitorStore(storeName, callback) {
+        try {
+            // Initial check of store data
+            const initialData = await this.getAllFromStore(storeName);
+            callback({
+                type: 'initial',
+                store: storeName,
+                data: initialData,
+                isEmpty: initialData.length === 0
+            });
+
+            // Set up ongoing monitoring
+            const handleStoreChange = (event) => {
+                if (event.detail.store === storeName) {
+                    callback({
+                        type: event.detail.action,
+                        store: storeName,
+                        data: event.detail.data,
+                        id: event.detail.id
+                    });
+                }
+            };
+
+            // Add listener and store reference for cleanup
+            window.addEventListener('storeChanged', handleStoreChange);
+            
+            // Return cleanup function
+            return () => {
+                window.removeEventListener('storeChanged', handleStoreChange);
+            };
+        } catch (error) {
+            console.error(`Error monitoring store ${storeName}:`, error);
+            throw error;
+        }
+    }
+
+    async connectStores(sourceStore, targetStore, processor) {
+        try {
+            let isProcessing = false;
+            let cleanup = null;
+
+            const processData = async (data) => {
+                if (isProcessing || !data) return;
+                
+                try {
+                    isProcessing = true;
+                    if (this.debugLogging) {
+                        console.log(`Processing data from ${sourceStore} to ${targetStore}`, {
+                            dataSize: Array.isArray(data) ? data.length : 1,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+
+                    await processor(data);
+
+                    // Dispatch an event about successful processing
+                    window.dispatchEvent(new CustomEvent('storeProcessing', { 
+                        detail: { 
+                            source: sourceStore,
+                            target: targetStore,
+                            status: 'success',
+                            timestamp: Date.now()
+                        }
+                    }));
+                } catch (error) {
+                    console.error(`Error processing data between ${sourceStore} and ${targetStore}:`, error);
+                    // Dispatch an event about failed processing
+                    window.dispatchEvent(new CustomEvent('storeProcessing', { 
+                        detail: { 
+                            source: sourceStore,
+                            target: targetStore,
+                            status: 'error',
+                            error: error.message,
+                            timestamp: Date.now()
+                        }
+                    }));
+                } finally {
+                    isProcessing = false;
+                }
+            };
+
+            // Set up the monitoring connection
+            cleanup = await this.monitorStore(sourceStore, async ({ type, data, isEmpty }) => {
+                if (this.debugLogging) {
+                    console.log(`Store monitor event: ${sourceStore} -> ${targetStore}`, {
+                        type,
+                        isEmpty,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+
+                if (type === 'initial' && !isEmpty) {
+                    // Process existing data
+                    const sourceData = await this.getAllFromStore(sourceStore);
+                    await processData(sourceData);
+                } else if (type === 'add' && data) {
+                    // Process new data
+                    await processData(data);
+                } else if (isEmpty) {
+                    // Notify about empty source store
+                    window.dispatchEvent(new CustomEvent('storeEmpty', { 
+                        detail: { 
+                            store: sourceStore,
+                            target: targetStore,
+                            timestamp: Date.now()
+                        }
+                    }));
+                }
+            });
+
+            // Return cleanup function
+            return () => {
+                if (cleanup) cleanup();
+            };
+        } catch (error) {
+            console.error(`Error connecting stores ${sourceStore} to ${targetStore}:`, error);
+            throw error;
+        }
+    }
+
+    async setupProcessingPoolConnections() {
+        // Connect processingPool to convertedBytes (for bits)
+        const poolToBytes = await this.connectStores(
+            'processingPool',
+            'convertedBytes',
+            async (data) => {
+                if (Array.isArray(data)) {
+                    const bitRecords = data.filter(record => record.type === 'bit');
+                    for (const record of bitRecords) {
+                        if (record.count > 0) {
+                            await this.storeConvertedBytes({
+                                symbol: record.symbol,
+                                count: record.count,
+                                type: 'bit'
+                            });
+                        }
+                    }
+                } else if (data.type === 'bit' && data.count > 0) {
+                    await this.storeConvertedBytes({
+                        symbol: data.symbol,
+                        count: data.count,
+                        type: 'bit'
+                    });
+                }
+            }
+        );
+
+        // Connect processingPool to filteredNoise (for noise)
+        const poolToNoise = await this.connectStores(
+            'processingPool',
+            'filteredNoise',
+            async (data) => {
+                if (Array.isArray(data)) {
+                    const noiseRecords = data.filter(record => record.type === 'noise');
+                    for (const record of noiseRecords) {
+                        if (record.count > 0) {
+                            await this.storeFilteredNoise({
+                                symbol: record.symbol,
+                                count: record.count,
+                                type: 'noise'
+                            });
+                        }
+                    }
+                } else if (data.type === 'noise' && data.count > 0) {
+                    await this.storeFilteredNoise({
+                        symbol: data.symbol,
+                        count: data.count,
+                        type: 'noise'
+                    });
+                }
+            }
+        );
+
+        // Return cleanup functions
+        return () => {
+            poolToBytes();
+            poolToNoise();
+        };
     }
 }
 

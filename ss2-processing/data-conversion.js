@@ -306,111 +306,261 @@ export class DataConversion {
     }
 
     startByteConversion() {
-        if (this.isConverting || this.byteConversionInterval) {
+        if (this.byteConversionInterval) {
             console.log('Conversion already running, stopping first');
             this.stopByteConversion();
             return;
         }
 
-        console.log('Starting byte conversion process');
+        console.log('Starting conversion processes');
         this.isConverting = true;
+        this.isPooling = true;
         
-        // Update button state
-        const convertButton = document.getElementById('convertBitsButton');
-        if (convertButton) {
-            convertButton.classList.add('active');
-        }
-
         this.lastProcessTime = Date.now();
         
         this.byteConversionInterval = setInterval(async () => {
             try {
-                // Get flow rate and loss rate
+                // Get flow rates and thresholds
                 const flowRateInput = document.getElementById('converted-bytes-flow-rate');
                 const cbLossRateInput = document.getElementById('cb-loss-%');
+                const nf1RateInput = document.getElementById('noise-filter-1');
+                const byteThresholdInput = document.getElementById('byte-convert-rate');
+                const entropyThresholdInput = document.getElementById('entropy-convert-rate');
                 
-                if (!flowRateInput) {
-                    throw new Error('Missing converted-bytes-flow-rate input');
+                if (!flowRateInput || !byteThresholdInput || !entropyThresholdInput) {
+                    throw new Error('Missing required inputs');
                 }
 
                 const now = Date.now();
                 const deltaTime = now - this.lastProcessTime;
                 const convertRate = parseInt(flowRateInput.value) || 10;
                 const cbLossRate = parseInt(cbLossRateInput?.value) || 0;
-                const symbolsToProcess = Math.floor(convertRate * (deltaTime / 1000));
+                const nf1Rate = parseInt(nf1RateInput?.value) || 0;
+                const bitsPerByte = parseInt(byteThresholdInput.value) || 8;
+                const noisePerEntropy = parseInt(entropyThresholdInput.value) || 8;
+                
+                // Separate maximums for bits and noise
+                const maxBitsToProcess = Math.floor(convertRate * (deltaTime / 1000));
+                const maxNoiseToProcess = Math.floor(convertRate * (deltaTime / 1000));
 
-                if (symbolsToProcess < 1) {
-                    return;
+                if (maxBitsToProcess < 1 && maxNoiseToProcess < 1) {
+                    return; // Skip this cycle but don't stop
                 }
 
                 this.lastProcessTime = now;
-                const bitsPerByte = 8;
                 const poolCounts = await this.environmentDB.getProcessingPoolCounts();
+                const poolSymbols = await this.environmentDB.getProcessingPool();
+                
+                let processedBitsThisCycle = 0;
+                let processedNoiseThisCycle = 0;
+                let batchReport = { bytes: [], entropy: [], filtered: [] };
 
-                let processedThisCycle = 0;
-                let batchReport = [];
+                // Process bits to bytes
+                const bitSymbols = poolSymbols.filter(symbol => symbol.type === 'bit');
+                for (const symbol of bitSymbols) {
+                    if (processedBitsThisCycle >= maxBitsToProcess) break;
 
-                if (poolCounts && poolCounts.bits && Object.keys(poolCounts.bits).length > 0) {
-                    console.log('Processing pool bits:', poolCounts.bits);
-                    
-                    for (const [symbol, count] of Object.entries(poolCounts.bits)) {
-                        if (processedThisCycle >= symbolsToProcess) break;
+                    if (symbol.count >= bitsPerByte) {
+                        const bytesToCreate = Math.min(
+                            Math.floor(symbol.count / bitsPerByte),
+                            maxBitsToProcess - processedBitsThisCycle
+                        );
 
-                        if (count >= bitsPerByte) {
-                            const bytesToCreate = Math.min(
-                                Math.floor(count / bitsPerByte),
-                                symbolsToProcess - processedThisCycle
-                            );
+                        if (bytesToCreate > 0) {
+                            const bitsToRemove = bytesToCreate * bitsPerByte;
+                            await this.environmentDB.decrementProcessingPoolBits(symbol.symbol, bitsToRemove);
 
-                            if (bytesToCreate > 0) {
-                                const bitsToRemove = bytesToCreate * bitsPerByte;
-                                await this.environmentDB.decrementProcessingPoolBits(symbol, bitsToRemove);
+                            // Handle CB Loss with similar approach to NF1
+                            let bytesPreserved = 0;
+                            let bytesLost = 0;
 
-                                // Apply CB Loss % - determine how many bytes become noise
-                                const bytesLost = Math.floor(bytesToCreate * (cbLossRate / 100));
-                                const bytesPreserved = bytesToCreate - bytesLost;
-
-                                // Store preserved bytes
-                                if (bytesPreserved > 0) {
-                                    await this.environmentDB.storeConvertedBytes({
-                                        symbol: symbol,
-                                        type: 'byte',
-                                        count: bytesPreserved,
-                                        timestamp: Date.now()
-                                    });
+                            if (bytesToCreate === 1) {
+                                // For single byte, use random chance
+                                if (Math.random() < (cbLossRate / 100)) {
+                                    bytesLost = 1;
+                                } else {
+                                    bytesPreserved = 1;
                                 }
+                            } else {
+                                // For multiple bytes, use percentage splitting
+                                bytesLost = Math.round(bytesToCreate * (cbLossRate / 100));
+                                bytesPreserved = bytesToCreate - bytesLost;
+                            }
 
-                                // Store lost bytes as noise in filteredNoise store
-                                if (bytesLost > 0) {
-                                    await this.environmentDB.storeFilteredNoise({
-                                        symbol: this.convertBitToNoise(symbol),
-                                        type: 'noise',
-                                        count: bytesLost,
-                                        timestamp: Date.now()
-                                    });
-                                }
+                            console.log('CB Loss calculation:', {
+                                bytesToCreate,
+                                cbLossRate,
+                                bytesLost,
+                                bytesPreserved,
+                                calculation: bytesToCreate === 1 
+                                    ? `Single byte: ${bytesLost ? 'lost' : 'preserved'} based on ${cbLossRate}% chance`
+                                    : `${bytesToCreate} * (${cbLossRate} / 100) = ${bytesLost}, preserved: ${bytesPreserved}`,
+                            });
 
-                                processedThisCycle += bytesToCreate;
-                                
-                                batchReport.push({
-                                    symbol,
+                            // Store preserved bytes
+                            if (bytesPreserved > 0) {
+                                await this.environmentDB.storeConvertedBytes({
+                                    symbol: symbol.symbol,
+                                    type: 'byte',
+                                    count: bytesPreserved,
+                                    timestamp: Date.now()
+                                });
+
+                                batchReport.bytes.push({
+                                    symbol: symbol.symbol,
                                     bytesCreated: bytesToCreate,
                                     bytesPreserved,
                                     bytesLost,
                                     bitsRemoved: bitsToRemove,
-                                    lossRate: cbLossRate
+                                    cbLossRate
                                 });
                             }
+
+                            // Store lost bytes as noise in filteredNoise store
+                            if (bytesLost > 0) {
+                                await this.environmentDB.storeFilteredNoise({
+                                    symbol: this.convertBitToNoise(symbol.symbol),
+                                    type: 'noise',
+                                    count: bytesLost,
+                                    timestamp: Date.now()
+                                });
+                            }
+
+                            processedBitsThisCycle += bytesToCreate;
+                            
+                            console.log('Bits processing results:', {
+                                symbol: symbol.symbol,
+                                totalProcessed: bytesToCreate,
+                                preserved: bytesPreserved,
+                                lost: bytesLost,
+                                cbLossRate,
+                                processingMethod: bytesToCreate === 1 ? 'random' : 'percentage'
+                            });
                         }
                     }
                 }
 
-                if (batchReport.length > 0) {
+                // Process noise to entropy
+                const noiseSymbols = poolSymbols.filter(symbol => symbol.type === 'noise');
+                console.log('Processing noise symbols:', {
+                    noiseSymbols: noiseSymbols.length,
+                    maxNoiseToProcess,
+                    noisePerEntropy,
+                    nf1Rate
+                });
+
+                for (const symbol of noiseSymbols) {
+                    if (processedNoiseThisCycle >= maxNoiseToProcess) break;
+
+                    if (symbol.count >= noisePerEntropy) {
+                        const noiseToProcess = Math.min(
+                            Math.floor(symbol.count / noisePerEntropy),
+                            maxNoiseToProcess - processedNoiseThisCycle
+                        );
+
+                        if (noiseToProcess > 0) {
+                            const noiseToRemove = noiseToProcess * noisePerEntropy;
+                            
+                            console.log('Processing noise:', {
+                                symbol: symbol.symbol,
+                                toProcess: noiseToProcess,
+                                toRemove: noiseToRemove,
+                                currentCount: symbol.count,
+                                nf1Rate
+                            });
+
+                            await this.environmentDB.decrementProcessingPoolNoise(symbol.symbol, noiseToRemove);
+                            
+                            // New approach to handle small numbers and ensure both filtered and entropy get processed
+                            let symbolsToFilter = 0;
+                            let symbolsToConvert = 0;
+                            
+                            if (noiseToProcess === 1) {
+                                // For single symbols, alternate based on random chance
+                                if (Math.random() < (nf1Rate / 100)) {
+                                    symbolsToFilter = 1;
+                                } else {
+                                    symbolsToConvert = 1;
+                                }
+                            } else {
+                                // For multiple symbols, use proper percentage splitting
+                                symbolsToFilter = Math.round(noiseToProcess * (nf1Rate / 100));
+                                symbolsToConvert = noiseToProcess - symbolsToFilter;
+                            }
+
+                            console.log('NF1 calculation:', {
+                                noiseToProcess,
+                                nf1Rate,
+                                symbolsToFilter,
+                                symbolsToConvert,
+                                calculation: noiseToProcess === 1 
+                                    ? `Single symbol: ${symbolsToFilter ? 'filtered' : 'converted'} based on ${nf1Rate}% chance`
+                                    : `${noiseToProcess} * (${nf1Rate} / 100) = ${symbolsToFilter}, remainder: ${symbolsToConvert}`,
+                            });
+
+                            // Store filtered noise
+                            if (symbolsToFilter > 0) {
+                                await this.environmentDB.storeFilteredNoise({
+                                    symbol: symbol.symbol,
+                                    type: 'noise',
+                                    count: symbolsToFilter,
+                                    timestamp: Date.now()
+                                });
+                                
+                                batchReport.filtered.push({
+                                    symbol: symbol.symbol,
+                                    filtered: symbolsToFilter,
+                                    nf1Rate
+                                });
+                            }
+
+                            // Store converted entropy
+                            if (symbolsToConvert > 0) {
+                                await this.environmentDB.storeConvertedBytes({
+                                    symbol: symbol.symbol,
+                                    type: 'entropy',
+                                    count: symbolsToConvert,
+                                    timestamp: Date.now()
+                                });
+                                
+                                batchReport.entropy.push({
+                                    symbol: symbol.symbol,
+                                    entropyCreated: symbolsToConvert,
+                                    nf1Rate
+                                });
+                            }
+
+                            processedNoiseThisCycle += noiseToProcess;
+                            
+                            console.log('Noise processing results:', {
+                                symbol: symbol.symbol,
+                                totalProcessed: noiseToProcess,
+                                filtered: symbolsToFilter,
+                                convertedToEntropy: symbolsToConvert,
+                                nf1Rate,
+                                processingMethod: noiseToProcess === 1 ? 'random' : 'percentage'
+                            });
+                        }
+                    }
+                }
+
+                // Only update displays and log if we processed something
+                if (batchReport.bytes.length > 0 || batchReport.entropy.length > 0 || batchReport.filtered.length > 0) {
                     console.log('Batch conversion report:', {
-                        processedThisCycle,
+                        processedBits: processedBitsThisCycle,
+                        processedNoise: processedNoiseThisCycle,
                         conversions: batchReport,
                         flowRate: convertRate,
-                        lossRate: cbLossRate
+                        cbLossRate,
+                        nf1Rate,
+                        calculations: {
+                            cbLoss: `${cbLossRate}% of bytes become noise`,
+                            nf1: `${nf1Rate}% of noise is filtered, remainder becomes entropy`
+                        },
+                        thresholds: {
+                            bitsPerByte,
+                            noisePerEntropy
+                        }
                     });
                     
                     const updatedPoolCounts = await this.environmentDB.getProcessingPoolCounts();
@@ -418,8 +568,10 @@ export class DataConversion {
                 }
 
             } catch (error) {
-                console.error('Error in byte conversion interval:', error);
-                this.stopByteConversion();
+                console.error('Error in conversion cycle:', error);
+                if (error.message === 'Missing required inputs') {
+                    this.stopByteConversion();
+                }
             }
         }, 50);
     }
@@ -462,18 +614,28 @@ export class DataConversion {
                 });
             }
 
-            // Update Converted Bytes display
-            const convertedBytes = await this.environmentDB.getConvertedBytes();
-            const bytesCount = convertedBytes
+            // Update Converted Bytes and Entropy displays separately
+            const convertedData = await this.environmentDB.getConvertedBytes();
+            const bytesCount = convertedData
                 .filter(b => b.type === 'byte')
                 .reduce((sum, b) => sum + (b.count || 1), 0);
+            const entropyCount = convertedData
+                .filter(b => b.type === 'entropy')
+                .reduce((sum, b) => sum + (b.count || 1), 0);
             
+            // Update CB display (bytes only)
             const cbDisplay = document.getElementById('convertedBytes');
             if (cbDisplay) {
                 cbDisplay.value = bytesCount.toString();
             }
 
-            // Update Converted Noise (CN) display
+            // Update CE display (entropy only)
+            const ceDisplay = document.getElementById('convertedEntropy');
+            if (ceDisplay) {
+                ceDisplay.value = entropyCount.toString();
+            }
+
+            // Update CN display (filtered noise)
             const filteredNoise = await this.environmentDB.getFilteredNoise();
             const noiseCount = filteredNoise
                 .filter(n => n.type === 'noise')
@@ -487,7 +649,8 @@ export class DataConversion {
             // Log current state
             console.log('Display State:', {
                 convertedBytes: bytesCount,
-                convertedNoise: noiseCount
+                convertedEntropy: entropyCount,
+                filteredNoise: noiseCount
             });
 
         } catch (error) {

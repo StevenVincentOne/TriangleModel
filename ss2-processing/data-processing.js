@@ -208,6 +208,12 @@ export class DataProcessing {
             MIN_LOG_INTERVAL: 5000
         };
         
+        this.recycleInterval = null;
+        this.isRecycling = false;
+        this.setupRecyclingControls();
+        
+        this.isUptaking = false;
+        
         this.setupControls();
         this.startProcessPoolMonitoring();
         this.initializeDashboardElements();
@@ -216,6 +222,8 @@ export class DataProcessing {
         window.addEventListener('storeChanged', async (event) => {
             if (event.detail.store === 'uptake') {
                 await this.updateUptakeDisplay();
+            } else if (event.detail.store === 'filteredNoise' || event.detail.store === 'all') {
+                await this.updateFilteredNoiseDisplay();
             }
         });
     }
@@ -235,22 +243,30 @@ export class DataProcessing {
         this.dashboardElements = {
             processData: document.getElementById('process-d'),
             processBits: document.getElementById('process-b'),
-            processNoise: document.getElementById('process-n')
+            processNoise: document.getElementById('process-n'),
+            filteredNoise: document.getElementById('convert-step-n')
         };
     }
 
     setupControls() {
         console.log('Setting up controls');
         
-        // Process button handler
-        const processButton = document.getElementById('processDataButton');
-        console.log('Process button element:', processButton);
-        
-        if (processButton) {
+        const uptakeButton = document.getElementById('processDataButton');
+        if (uptakeButton) {
             // Remove any existing listeners first
-            processButton.removeEventListener('click', this.processButtonClick);
-            // Add new listener with bound context
-            processButton.addEventListener('click', () => this.processButtonClick());
+            uptakeButton.replaceWith(uptakeButton.cloneNode(true));
+            const newUptakeButton = document.getElementById('processDataButton');
+            
+            newUptakeButton.addEventListener('click', () => {
+                this.toggleUptake();
+            });
+            
+            // Set initial state
+            if (this.isUptaking) {
+                newUptakeButton.classList.add('active');
+            } else {
+                newUptakeButton.classList.remove('active');
+            }
         }
 
         // Flow rate control
@@ -673,6 +689,7 @@ export class DataProcessing {
     // Add cleanup method
     cleanup() {
         this.stopProcessPoolMonitoring();
+        this.stopRecycling();
     }
 
     // Make sure this is called when component is destroyed
@@ -800,5 +817,130 @@ export class DataProcessing {
         } catch (error) {
             console.error('Error zeroing stores:', error);
         }
+    }
+
+    setupRecyclingControls() {
+        const recycleButton = document.getElementById('recycleNoiseButton');
+        if (recycleButton) {
+            recycleButton.addEventListener('click', () => this.handleRecycleButtonClick());
+        }
+    }
+
+    async handleRecycleButtonClick() {
+        if (this.isRecycling) {
+            this.stopRecycling();
+            const recycleButton = document.getElementById('recycleNoiseButton');
+            if (recycleButton) {
+                recycleButton.classList.remove('active');
+            }
+        } else {
+            this.startRecycling();
+            const recycleButton = document.getElementById('recycleNoiseButton');
+            if (recycleButton) {
+                recycleButton.classList.add('active');
+            }
+        }
+    }
+
+    async startRecycling() {
+        if (this.isRecycling) return;
+        
+        this.isRecycling = true;
+        const recycleRateInput = document.getElementById('noise-recycle-rate');
+        const symbolsPerSecond = parseInt(recycleRateInput?.value) || 10;
+        const intervalMs = 1000 / symbolsPerSecond;
+
+        this.recycleInterval = setInterval(async () => {
+            try {
+                // Get filtered noise symbols
+                const filteredNoise = await this.environmentDB.getFilteredNoise();
+                
+                if (!filteredNoise || filteredNoise.length === 0) {
+                    console.log('No filtered noise to recycle');
+                    this.stopRecycling();
+                    return;
+                }
+
+                // Get the first noise symbol
+                const noiseSymbol = filteredNoise[0];
+
+                // Get current environmental pool
+                const envPool = await this.environmentDB.getEnvironmentalPool();
+                let currentPool = envPool[0] || { bits: [], noise: [] };
+
+                // Add noise symbol to environmental pool
+                currentPool.noise.push(noiseSymbol.symbol);
+
+                // Update environmental pool
+                if (envPool[0]) {
+                    await this.environmentDB.updateEnvironmentalPool(currentPool.id, currentPool);
+                } else {
+                    await this.environmentDB.storeEnvironmentalPool(currentPool);
+                }
+
+                // Remove symbol from filtered noise
+                await this.environmentDB.deleteFilteredNoise(noiseSymbol.id);
+
+                // Update filtered noise display immediately
+                await this.updateFilteredNoiseDisplay();
+
+                // Trigger store updates
+                window.dispatchEvent(new CustomEvent('storeChanged', { 
+                    detail: { 
+                        store: 'all',
+                        action: 'recycle'
+                    }
+                }));
+
+            } catch (error) {
+                console.error('Error recycling noise:', error);
+                this.stopRecycling();
+            }
+        }, intervalMs);
+    }
+
+    stopRecycling() {
+        if (this.recycleInterval) {
+            clearInterval(this.recycleInterval);
+            this.recycleInterval = null;
+        }
+        this.isRecycling = false;
+        
+        const recycleButton = document.getElementById('recycleNoiseButton');
+        if (recycleButton) {
+            recycleButton.classList.remove('active');
+        }
+    }
+
+    // Add new method to update filtered noise display
+    async updateFilteredNoiseDisplay() {
+        try {
+            const filteredNoise = await this.environmentDB.getFilteredNoise();
+            const count = filteredNoise ? filteredNoise.length : 0;
+            
+            if (this.dashboardElements.filteredNoise) {
+                this.dashboardElements.filteredNoise.value = count;
+            }
+        } catch (error) {
+            console.error('Error updating filtered noise display:', error);
+        }
+    }
+
+    toggleUptake() {
+        const uptakeButton = document.getElementById('processDataButton');
+        
+        if (this.isUptaking) {
+            this.stopProcessing();
+            if (uptakeButton) {
+                uptakeButton.classList.remove('active');
+            }
+        } else {
+            this.startProcessing();
+            if (uptakeButton) {
+                uptakeButton.classList.add('active');
+            }
+        }
+        
+        this.isUptaking = !this.isUptaking;
     }
 }
