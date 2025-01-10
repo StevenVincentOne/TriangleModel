@@ -209,7 +209,6 @@ export class DataProcessing {
         };
         
         this.recycleInterval = null;
-        this.isRecycling = false;
         this.setupRecyclingControls();
         
         this.isUptaking = false;
@@ -226,6 +225,9 @@ export class DataProcessing {
                 await this.updateFilteredNoiseDisplay();
             }
         });
+
+        this.isSystemRunning = false;
+        this.setupSystemControls();
     }
 
     async init() {
@@ -856,8 +858,8 @@ export class DataProcessing {
                 const filteredNoise = await this.environmentDB.getFilteredNoise();
                 
                 if (!filteredNoise || filteredNoise.length === 0) {
-                    console.log('No filtered noise to recycle');
-                    this.stopRecycling();
+                    // Instead of stopping, just log and continue waiting
+                    console.log('Waiting for filtered noise to recycle...');
                     return;
                 }
 
@@ -884,6 +886,12 @@ export class DataProcessing {
                 // Update filtered noise display immediately
                 await this.updateFilteredNoiseDisplay();
 
+                // Log successful recycling
+                console.log('Recycled noise symbol:', {
+                    symbol: noiseSymbol.symbol,
+                    remainingFiltered: filteredNoise.length - 1
+                });
+
                 // Trigger store updates
                 window.dispatchEvent(new CustomEvent('storeChanged', { 
                     detail: { 
@@ -894,9 +902,16 @@ export class DataProcessing {
 
             } catch (error) {
                 console.error('Error recycling noise:', error);
-                this.stopRecycling();
+                // Don't stop on error, just log it and continue
+                console.log('Continuing to wait for valid filtered noise...');
             }
         }, intervalMs);
+
+        // Update button state
+        const recycleButton = document.getElementById('recycleNoiseButton');
+        if (recycleButton) {
+            recycleButton.classList.add('active');
+        }
     }
 
     stopRecycling() {
@@ -910,6 +925,7 @@ export class DataProcessing {
         if (recycleButton) {
             recycleButton.classList.remove('active');
         }
+        console.log('Recycling stopped');
     }
 
     // Add new method to update filtered noise display
@@ -942,5 +958,91 @@ export class DataProcessing {
         }
         
         this.isUptaking = !this.isUptaking;
+    }
+
+    setupSystemControls() {
+        const systemButton = document.getElementById('systemButton');
+        if (systemButton) {
+            systemButton.addEventListener('click', () => this.handleSystemButtonClick());
+        }
+    }
+
+    async handleSystemButtonClick() {
+        const systemButton = document.getElementById('systemButton');
+        
+        if (this.isSystemRunning) {
+            // Stop all processes
+            this.stopSystem();
+            systemButton?.classList.remove('active');
+        } else {
+            // Start all processes
+            this.startSystem();
+            systemButton?.classList.add('active');
+        }
+    }
+
+    async startSystem() {
+        if (this.isSystemRunning) return;
+        
+        this.isSystemRunning = true;
+        
+        // Start all processes
+        // Trigger clicks on all workflow buttons
+        document.getElementById('processDataButton')?.click();
+        document.getElementById('letterFlowToggle')?.click();
+        document.getElementById('convertBitsButton')?.click();
+        document.getElementById('recycleNoiseButton')?.click();
+    }
+
+    stopSystem() {
+        if (!this.isSystemRunning) return;
+        
+        this.isSystemRunning = false;
+        
+        // Stop all processes by triggering clicks on active buttons
+        if (document.getElementById('processDataButton')?.classList.contains('active')) {
+            document.getElementById('processDataButton')?.click();
+        }
+        if (document.getElementById('letterFlowToggle')?.classList.contains('active')) {
+            document.getElementById('letterFlowToggle')?.click();
+        }
+        if (document.getElementById('convertBitsButton')?.classList.contains('active')) {
+            document.getElementById('convertBitsButton')?.click();
+        }
+        if (document.getElementById('recycleNoiseButton')?.classList.contains('active')) {
+            document.getElementById('recycleNoiseButton')?.click();
+        }
+    }
+
+    toggleUptake() {
+        const uptakeButton = document.getElementById('processDataButton');
+        
+        if (this.isUptaking) {
+            this.stopProcessing();
+            if (uptakeButton) {
+                uptakeButton.classList.remove('active');
+            }
+        } else {
+            this.startProcessing();
+            if (uptakeButton) {
+                uptakeButton.classList.add('active');
+            }
+        }
+        
+        this.isUptaking = !this.isUptaking;
+    }
+
+    handleLetterFlowToggle() {
+        const flowButton = document.getElementById('letterFlowToggle');
+        
+        if (this.isFlowing) {
+            this.stopLetterFlow();
+            flowButton?.classList.remove('active');
+        } else {
+            this.startLetterFlow();
+            flowButton?.classList.add('active');
+        }
+        
+        this.isFlowing = !this.isFlowing;
     }
 }

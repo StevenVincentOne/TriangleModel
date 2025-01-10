@@ -213,17 +213,46 @@ export class CapacityModule {
     }
 
     updateDashboard(data) {
+        // Store the data for future reference
+        this.currentDashboardData = data;
+        
         console.log('CapacityModule updating dashboard with data:', data);
 
-        if (!data) {
-            console.warn('No data provided to updateDashboard');
-            return;
+        // Update CC area values with simple decimal formatting and wider width
+        const ccElement = document.getElementById('circumcircle-area');
+        if (ccElement) {
+            ccElement.value = data.totalCapacity.toFixed(2);
+            ccElement.style.textAlign = 'center';
+            ccElement.style.width = '14ch';
+            ccElement.style.minWidth = '14ch';
+        }
+
+        const cc1Element = document.getElementById('cc1-area');
+        if (cc1Element) {
+            cc1Element.value = data.cc1.toFixed(2);
+            cc1Element.style.textAlign = 'center';
+            cc1Element.style.width = '14ch';
+            cc1Element.style.minWidth = '14ch';
+        }
+
+        const cc2Element = document.getElementById('cc2-area');
+        if (cc2Element) {
+            cc2Element.value = data.cc2.toFixed(2);
+            cc2Element.style.textAlign = 'center';
+            cc2Element.style.width = '14ch';
+            cc2Element.style.minWidth = '14ch';
+        }
+
+        const cc3Element = document.getElementById('cc3-area');
+        if (cc3Element) {
+            cc3Element.value = data.cc3.toFixed(2);
+            cc3Element.style.textAlign = 'center';
+            cc3Element.style.width = '14ch';
+            cc3Element.style.minWidth = '14ch';
         }
 
         // Calculate utilization percentages
         const ccuPercent = (data.usedCapacity / data.totalCapacity) * 100;
-        
-        // Divide usedCapacity by 3 for even distribution across CC1, CC2, CC3
         const usedPerCC = data.usedCapacity / 3;
         const ccu1Percent = (usedPerCC / data.cc1) * 100;
         const ccu2Percent = (usedPerCC / data.cc2) * 100;
@@ -237,26 +266,26 @@ export class CapacityModule {
             usedPerCC
         });
 
-        // Update CCU values with percentages
+        // Update CCU values with percentages (using toFixed(2) instead of Math.round)
         const ccuElement = document.getElementById('circumcircle-utilization');
         if (ccuElement) {
-            ccuElement.value = `${Math.round(ccuPercent)}%`;
+            ccuElement.value = ccuPercent.toFixed(2);  // Remove % symbol for now
         }
 
         // Update CCU1, CCU2, CCU3 with percentages
         const ccu1Element = document.getElementById('cc1-utilization');
         if (ccu1Element) {
-            ccu1Element.value = `${Math.round(ccu1Percent)}%`;
+            ccu1Element.value = ccu1Percent.toFixed(2);  // Remove % symbol for now
         }
 
         const ccu2Element = document.getElementById('cc2-utilization');
         if (ccu2Element) {
-            ccu2Element.value = `${Math.round(ccu2Percent)}%`;
+            ccu2Element.value = ccu2Percent.toFixed(2);  // Remove % symbol for now
         }
 
         const ccu3Element = document.getElementById('cc3-utilization');
         if (ccu3Element) {
-            ccu3Element.value = `${Math.round(ccu3Percent)}%`;
+            ccu3Element.value = ccu3Percent.toFixed(2);  // Remove % symbol for now
         }
 
         // Update ED%
@@ -266,11 +295,23 @@ export class CapacityModule {
             console.log(`ED% (Environmental Data %): ${data.edPercent}%`);
         }
 
-        // Update ED value
+        // Update ED value and trigger utilization update
         const edElement = document.getElementById('system-ed');
         if (edElement) {
-            edElement.value = Math.round(data.usedCapacity);
-            console.log(`ED (System Environmental Data): ${Math.round(data.usedCapacity)}`);
+            const previousValue = edElement.value;
+            const newValue = Math.round(data.usedCapacity);
+            edElement.value = newValue;
+            console.log(`ED (System Environmental Data): ${newValue}`);
+            
+            // If ED value changed, update utilizations
+            if (previousValue !== newValue.toString()) {
+                this.updateUtilizationPercentages({
+                    totalExternal: data.totalCapacity,
+                    cc1: data.cc1,
+                    cc2: data.cc2,
+                    cc3: data.cc3
+                });
+            }
         }
 
         // Update EB%
@@ -325,34 +366,33 @@ export class CapacityModule {
     }
 
     updateUtilizationPercentages(metrics) {
-        console.log('CapacityModule received metrics update:', metrics);
+        console.log('CapacityModule: Received metrics update:', metrics);
         
         if (!metrics) {
-            console.warn('No metrics provided to updateUtilizationPercentages');
+            console.warn('CapacityModule: No metrics provided to updateUtilizationPercentages');
             return;
         }
 
-        // Get current ED value and ED percentage
+        // Get current ED value
         const edElement = document.getElementById('system-ed');
-        const edPercentElement = document.getElementById('ed-percent');
         const currentED = edElement ? parseFloat(edElement.value) : 0;
-        const edPercent = edPercentElement ? parseFloat(edPercentElement.value) : 50;
         
-        console.log('Current values:', {
-            ED: currentED,
-            'ED%': edPercent,
-            totalCapacity: metrics.totalExternal
-        });
+        console.log('CapacityModule: Current ED:', currentED);
 
-        // Calculate new utilization based on current ED and new capacity
+        if (metrics.totalExternal === 0) {
+            console.warn('CapacityModule: totalExternal is 0, cannot calculate utilization.');
+            return;
+        }
+
+        // Calculate new utilization based on current ED and capacity
         const ccuPercent = (currentED / metrics.totalExternal) * 100;
         const usedPerCC = currentED / 3; // Even distribution across CC1/2/3
         
         const ccu1Percent = (usedPerCC / metrics.cc1) * 100;
         const ccu2Percent = (usedPerCC / metrics.cc2) * 100;
         const ccu3Percent = (usedPerCC / metrics.cc3) * 100;
-        
-        console.log('Calculated utilization:', {
+
+        console.log('CapacityModule: Calculated utilization percentages:', {
             ccuPercent,
             ccu1Percent,
             ccu2Percent,
@@ -360,25 +400,24 @@ export class CapacityModule {
             usedPerCC
         });
 
-        // Update CCU displays
-        const ccuElement = document.getElementById('circumcircle-utilization');
-        if (ccuElement) {
-            ccuElement.value = `${Math.round(ccuPercent)}%`;
-        }
+        // Update CCU displays with null checks and 2 decimal places
+        const updateUtilization = (elementId, value) => {
+            const element = document.getElementById(elementId);
+            if (element) {
+                const formattedValue = value.toFixed(2); // Ensure two decimal places
+                console.log(`CapacityModule: Setting ${elementId} to ${formattedValue}%`);
+                element.value = `${formattedValue}%`;
+                console.log(`CapacityModule: ${elementId} now has value "${element.value}"`);
+            } else {
+                console.warn(`CapacityModule: Element with ID ${elementId} not found.`);
+            }
+        };
 
-        const ccu1Element = document.getElementById('cc1-utilization');
-        if (ccu1Element) {
-            ccu1Element.value = `${Math.round(ccu1Percent)}%`;
-        }
+        updateUtilization('circumcircle-utilization', ccuPercent);
+        updateUtilization('cc1-utilization', ccu1Percent);
+        updateUtilization('cc2-utilization', ccu2Percent);
+        updateUtilization('cc3-utilization', ccu3Percent);
 
-        const ccu2Element = document.getElementById('cc2-utilization');
-        if (ccu2Element) {
-            ccu2Element.value = `${Math.round(ccu2Percent)}%`;
-        }
-
-        const ccu3Element = document.getElementById('cc3-utilization');
-        if (ccu3Element) {
-            ccu3Element.value = `${Math.round(ccu3Percent)}%`;
-        }
+        console.log('CapacityModule: Dashboard update complete');
     }
 } 

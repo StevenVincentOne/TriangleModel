@@ -314,8 +314,13 @@ export class DataConversion {
 
         console.log('Starting conversion processes');
         this.isConverting = true;
-        this.isPooling = true;
         
+        // Add active state to button
+        const convertButton = document.getElementById('convertBitsButton');
+        if (convertButton) {
+            convertButton.classList.add('active');
+        }
+
         this.lastProcessTime = Date.now();
         
         this.byteConversionInterval = setInterval(async () => {
@@ -442,12 +447,7 @@ export class DataConversion {
 
                 // Process noise to entropy
                 const noiseSymbols = poolSymbols.filter(symbol => symbol.type === 'noise');
-                console.log('Processing noise symbols:', {
-                    noiseSymbols: noiseSymbols.length,
-                    maxNoiseToProcess,
-                    noisePerEntropy,
-                    nf1Rate
-                });
+                
 
                 for (const symbol of noiseSymbols) {
                     if (processedNoiseThisCycle >= maxNoiseToProcess) break;
@@ -879,3 +879,27 @@ export class DataConversion {
         }
     }
 }
+
+// Add this function to handle input events
+function setupInputEventListeners() {
+    // Get all number inputs in the system intelligence panels
+    const inputs = document.querySelectorAll('.system-intelligence-inputs input[type="number"]');
+    
+    inputs.forEach(input => {
+        input.addEventListener('keypress', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent default form submission
+                input.blur(); // Remove focus from input
+                
+                // Trigger change event to ensure value is updated
+                const changeEvent = new Event('change', { bubbles: true });
+                input.dispatchEvent(changeEvent);
+            }
+        });
+    });
+}
+
+// Call this when the document is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    setupInputEventListeners();
+});

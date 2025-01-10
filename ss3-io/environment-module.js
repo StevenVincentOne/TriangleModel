@@ -15,7 +15,7 @@ export class EnvironmentModule {
         this.flowRate = 10;
         this.enFlowRate = 0;
         this.enGenerationInterval = null;
-        this.environmentalData = new EnvironmentalData();
+        this.environmentalData = new EnvironmentalData(this.environmentDB, this.setEnvironmentInputs.bind(this));
         this.capacityModule = null;
         this.addFlowRateEventListeners();
         
@@ -35,16 +35,12 @@ export class EnvironmentModule {
         };
 
         this.environmentDB = new EnvironmentDatabase();
-        this.environmentData = new EnvironmentalData(this.environmentDB);
+        this.environmentData = new EnvironmentalData(this.environmentDB, this.setEnvironmentInputs.bind(this));
 
         this.dashboardElements = {};
         this.initializeDashboardElements();
         this.initializeControls();
         
-        
-        
-        
-
         // Add debug logging
         console.log('Environment Module initialized with:', {
             cc: this.getCC(),
@@ -281,6 +277,19 @@ export class EnvironmentModule {
             cc3Area: document.getElementById('cc3-area'),
             cc3Utilization: document.getElementById('cc3-utilization')
         };
+
+        // Add listeners for environmental data changes
+        this.dashboardElements.environmentalData?.addEventListener('change', () => {
+            this.handleEnvironmentalDataChange();
+        });
+
+        this.dashboardElements.environmentalBits?.addEventListener('change', () => {
+            this.handleEnvironmentalDataChange();
+        });
+
+        this.dashboardElements.environmentalNoise?.addEventListener('change', () => {
+            this.handleEnvironmentalDataChange();
+        });
     }
 
     async initializeEnvironmentalData(resetToZero = false) {
@@ -309,39 +318,38 @@ export class EnvironmentModule {
 
     updateDashboard() {
         const metrics = this.triangleSystem.circleMetrics.calculateExternalRegions();
-        if (metrics) {
-            // Update CC areas only
-            if (this.dashboardElements.circumcircleArea) {
-                this.dashboardElements.circumcircleArea.value = metrics.totalExternal.toFixed(2);
-            }
-            if (this.dashboardElements.cc1Area) {
-                this.dashboardElements.cc1Area.value = metrics.cc1.toFixed(2);
-            }
-            if (this.dashboardElements.cc2Area) {
-                this.dashboardElements.cc2Area.value = metrics.cc2.toFixed(2);
-            }
-            if (this.dashboardElements.cc3Area) {
-                this.dashboardElements.cc3Area.value = metrics.cc3.toFixed(2);
-            }
+        if (!metrics) return;
 
-            // Update Environmental Data values
-            if (this.dashboardElements.environmentalData) {
-                this.dashboardElements.environmentalData.value = 
-                    this.environmentalData.environmentalData.toFixed(2);
-            }
-            if (this.dashboardElements.environmentalBits) {
-                this.dashboardElements.environmentalBits.value = 
-                    this.environmentalData.environmentalBits.toFixed(2);
-            }
-            if (this.dashboardElements.environmentalNoise) {
-                this.dashboardElements.environmentalNoise.value = 
-                    this.environmentalData.environmentalNoise.toFixed(2);
-            }
+        // Update CC areas
+        if (this.dashboardElements.circumcircleArea) {
+            this.dashboardElements.circumcircleArea.value = metrics.totalExternal.toFixed(2);
+        }
+        if (this.dashboardElements.cc1Area) {
+            this.dashboardElements.cc1Area.value = metrics.cc1.toFixed(2);
+        }
+        if (this.dashboardElements.cc2Area) {
+            this.dashboardElements.cc2Area.value = metrics.cc2.toFixed(2);
+        }
+        if (this.dashboardElements.cc3Area) {
+            this.dashboardElements.cc3Area.value = metrics.cc3.toFixed(2);
+        }
 
-            // Notify CapacityModule of metrics change
-            if (this.triangleSystem.capacityModule) {
-                this.triangleSystem.capacityModule.updateUtilizationPercentages(metrics);
-            }
+        // Create dashboard data object
+        const dashboardData = {
+            totalCapacity: metrics.totalExternal,
+            usedCapacity: parseFloat(this.dashboardElements.environmentalData?.value || 0),
+            cc1: metrics.cc1,
+            cc2: metrics.cc2,
+            cc3: metrics.cc3,
+            edPercent: parseFloat(document.getElementById('ed-percent')?.value || 0),
+            ebPercent: parseFloat(document.getElementById('eb-percent')?.value || 0),
+            bitsCount: parseFloat(this.dashboardElements.environmentalBits?.value || 0),
+            noiseCount: parseFloat(this.dashboardElements.environmentalNoise?.value || 0)
+        };
+
+        // Update Environmental Data values and notify CapacityModule
+        if (this.triangleSystem.capacityModule) {
+            this.triangleSystem.capacityModule.updateDashboard(dashboardData);
         }
     }
 
@@ -356,7 +364,7 @@ export class EnvironmentModule {
         return (this.environmentalData.environmentalData / cc) * 100;
     }
 
-    // New method to update only CC values
+    // Modify updateCircleCapacities to use the same pattern
     updateCircleCapacities() {
         try {
             const metrics = this.triangleSystem?.circleMetrics?.calculateExternalRegions();
@@ -365,8 +373,6 @@ export class EnvironmentModule {
                 return;
             }
 
-            console.log('Updating circle capacities with metrics:', metrics);
-            
             // Update area displays
             if (this.dashboardElements.circumcircleArea) {
                 this.dashboardElements.circumcircleArea.value = metrics.totalExternal?.toFixed(2) || '0.00';
@@ -381,14 +387,57 @@ export class EnvironmentModule {
                 this.dashboardElements.cc3Area.value = metrics.cc3?.toFixed(2) || '0.00';
             }
 
-            // Notify CapacityModule of the update
+            // Create dashboard data object
+            const dashboardData = {
+                totalCapacity: metrics.totalExternal,
+                usedCapacity: parseFloat(this.dashboardElements.environmentalData?.value || 0),
+                cc1: metrics.cc1,
+                cc2: metrics.cc2,
+                cc3: metrics.cc3,
+                edPercent: parseFloat(document.getElementById('ed-percent')?.value || 0),
+                ebPercent: parseFloat(document.getElementById('eb-percent')?.value || 0),
+                bitsCount: parseFloat(this.dashboardElements.environmentalBits?.value || 0),
+                noiseCount: parseFloat(this.dashboardElements.environmentalNoise?.value || 0)
+            };
+
+            // Update through CapacityModule
             if (this.triangleSystem?.capacityModule) {
-                console.log('Notifying CapacityModule of metrics update');
-                this.triangleSystem.capacityModule.updateUtilizationPercentages(metrics);
+                this.triangleSystem.capacityModule.updateDashboard(dashboardData);
             }
 
         } catch (error) {
             console.error('Error in updateCircleCapacities:', error);
+        }
+    }
+
+    // Add method to handle environmental data changes
+    handleEnvironmentalDataChange() {
+        console.log('handleEnvironmentalDataChange: Triggered');
+        const metrics = this.triangleSystem?.circleMetrics?.calculateExternalRegions();
+        if (!metrics) {
+            console.warn('handleEnvironmentalDataChange: No metrics available');
+            return;
+        }
+
+        const dashboardData = {
+            totalCapacity: metrics.totalExternal,
+            usedCapacity: parseFloat(this.dashboardElements.environmentalData?.value || 0),
+            cc1: metrics.cc1,
+            cc2: metrics.cc2,
+            cc3: metrics.cc3,
+            edPercent: parseFloat(document.getElementById('ed-percent')?.value || 0),
+            ebPercent: parseFloat(document.getElementById('eb-percent')?.value || 0),
+            bitsCount: parseFloat(this.dashboardElements.environmentalBits?.value || 0),
+            noiseCount: parseFloat(this.dashboardElements.environmentalNoise?.value || 0)
+        };
+
+        console.log('handleEnvironmentalDataChange: Dashboard Data Prepared', dashboardData);
+
+        if (this.triangleSystem?.capacityModule) {
+            this.triangleSystem.capacityModule.updateDashboard(dashboardData);
+            console.log('handleEnvironmentalDataChange: CapacityModule.updateDashboard called');
+        } else {
+            console.warn('handleEnvironmentalDataChange: CapacityModule not found');
         }
     }
 
@@ -565,19 +614,20 @@ export class EnvironmentModule {
         const enInput = document.getElementById('system-en');
 
         if (edInput) {
-            edInput.value = Math.round(totalData);
-            
+            edInput.value = totalData.toFixed(2);
+            edInput.dispatchEvent(new Event('change'));
+            console.log(`EnvironmentModule: Updated system-ed to ${edInput.value}`);
         }
         if (ebInput) {
-            ebInput.value = Math.round(totalBits);
-            
+            ebInput.value = totalBits.toFixed(2);
+            ebInput.dispatchEvent(new Event('change'));
+            console.log(`EnvironmentModule: Updated system-eb to ${ebInput.value}`);
         }
         if (enInput) {
-            enInput.value = Math.round(totalNoise);
-            
+            enInput.value = totalNoise.toFixed(2);
+            enInput.dispatchEvent(new Event('change'));
+            console.log(`EnvironmentModule: Updated system-en to ${enInput.value}`);
         }
-
-        
     }
 
     async startStoreMonitoring() {
@@ -639,7 +689,7 @@ export class EnvironmentModule {
 }
 
 class EnvironmentalData {
-    constructor(environmentDB) {
+    constructor(environmentDB, onChangeCallback) {
         this.environmentDB = environmentDB;
         this._environmentalData = 0;  // ED
         this._environmentalBits = 0;   // EB
@@ -647,6 +697,7 @@ class EnvironmentalData {
         this.cc1Data = 0;
         this.cc2Data = 0;
         this.cc3Data = 0;
+        this.onChangeCallback = onChangeCallback;
     }
 
     get environmentalData() {
@@ -655,44 +706,49 @@ class EnvironmentalData {
 
     set environmentalData(value) {
         this._environmentalData = Math.max(0, value);
-        // When ED is set, distribute it equally between EB and EN
+        // Distribute ED equally between EB and EN
         this._environmentalBits = this._environmentalData * 0.5;
         this._environmentalNoise = this._environmentalData * 0.5;
+        this.triggerChange();
     }
 
     get environmentalBits() {
         return this._environmentalBits;
     }
 
-    get environmentalNoise() {
-        return this._environmentalNoise;
-    }
-
     set environmentalBits(value) {
         this._environmentalBits = Math.max(0, value);
         this.recalculateED();
+        this.triggerChange();
+    }
+
+    get environmentalNoise() {
+        return this._environmentalNoise;
     }
 
     set environmentalNoise(value) {
         this._environmentalNoise = Math.max(0, value);
         this.recalculateED();
+        this.triggerChange();
     }
 
     recalculateED() {
         this._environmentalData = this._environmentalBits + this._environmentalNoise;
     }
 
-    // Add method to directly set bits and noise without recalculating
+    // Method to directly set bits and noise without recalculating ED
     setDirectly(bits, noise) {
         this._environmentalBits = Math.max(0, bits);
         this._environmentalNoise = Math.max(0, noise);
         this._environmentalData = this._environmentalBits + this._environmentalNoise;
+        this.triggerChange();
     }
 
     decrementBits() {
         if (this._environmentalBits > 0) {
             this._environmentalBits = Math.max(0, this._environmentalBits - 1);
             this.recalculateED();
+            this.triggerChange();
         }
     }
 
@@ -700,12 +756,26 @@ class EnvironmentalData {
         if (this._environmentalNoise > 0) {
             this._environmentalNoise = Math.max(0, this._environmentalNoise - 1);
             this.recalculateED();
+            this.triggerChange();
         }
     }
 
     incrementNoise() {
         this._environmentalNoise++;
         this.recalculateED();
+        this.triggerChange();
+    }
+
+    // Trigger the callback with current values
+    triggerChange() {
+        if (typeof this.onChangeCallback === 'function') {
+            console.log('EnvironmentalData changed:', {
+                environmentalData: this._environmentalData,
+                environmentalBits: this._environmentalBits,
+                environmentalNoise: this._environmentalNoise
+            });
+            this.onChangeCallback(this._environmentalData, this._environmentalBits, this._environmentalNoise);
+        }
     }
 }
 

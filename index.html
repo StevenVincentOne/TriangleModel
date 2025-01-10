@@ -173,6 +173,7 @@
                             </div>
                         </div>
                         <div class="button-row">
+                            <button id="systemButton" class="btn">System</button>
                             <button id="processDataButton" class="btn">Uptake</button>
                             <button id="letterFlowToggle" class="btn">Pool</button>
                         </div>
@@ -252,11 +253,11 @@
                          <div class="input-row">
                             <label for="cb-loss-%">CB Loss %</label>
                             <input type="number" id="cb-loss-%" min="0" max="100" value="0">
-                        </div><div style="display: flex; align-items: center; gap: 2px;">
-                                <label for="noise-filter-1">NF1</label>
-                                <input type="number" id="noise-filter-1" min="0" max="100" value="0" 
-                                    style="width: 40px; text-align: center;">
-                            </div>
+                        </div>
+                        <div class="input-row">
+                            <label for="noise-filter-1">NF1</label>
+                            <input type="number" id="noise-filter-1" min="0" max="100" value="0"> 
+                        </div>
                         <div class="button-row intelligence-controls" style="display: flex; gap: 2px; justify-content: space-between;">
                             <div style="display: flex; align-items: center; gap: 2px;">
                                 <button id="convertBitsButton" class="btn">Convert</button>
@@ -395,7 +396,7 @@
                             <input id="circumcircle-area" class="env-input" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
-                            <label>CCU</label>
+                            <label>CCU%</label>
                             <input id="circumcircle-utilization" class="env-input" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
@@ -403,7 +404,7 @@
                             <input id="cc1-area" class="env-input" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
-                            <label>CCU1</label>
+                            <label>CCU1%</label>
                             <input id="cc1-utilization" class="env-input" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
@@ -411,7 +412,7 @@
                             <input id="cc2-area" class="env-input" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
-                            <label>CCU2</label>
+                            <label>CCU2%</label>
                             <input id="cc2-utilization" class="env-input" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
@@ -419,7 +420,7 @@
                             <input id="cc3-area" class="env-input" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
-                            <label>CCU3</label>
+                            <label>CCU3%</label>
                             <input id="cc3-utilization" class="env-input" type="text" readonly>
                         </div>
                     </div>
