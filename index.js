@@ -10,9 +10,32 @@ import { DataProcessing } from './ss2-processing/data-processing.js';
 import { DataConversion } from './ss2-processing/data-conversion.js';
 import { EnvironmentDatabase } from './shared/ui/database.js';
 import { environmentDB } from './shared/ui/database.js';
+import { StateModule } from './ss1-state/state-module.js';
+import { UptakeSystem } from './ss2-processing/uptake.js';
+import { PoolSystem } from './ss2-processing/pool.js';
+import { RecycleModule } from './ss2-processing/recycle.js';
+import { SystemControl } from './shared/system-control.js';
+
+// Initialize both databases and connect them
+async function initializeDatabases() {
+    try {
+        // Wait for EnvironmentDB to be ready
+        await environmentDB.ready;
+        console.log('EnvironmentDB initialized');
+
+        // Optional: Set up debug logging for state data imports
+        window.addEventListener('stateDataImported', (event) => {
+            console.log('State data imported:', event.detail);
+        });
+
+    } catch (error) {
+        console.error('Error initializing databases:', error);
+    }
+}
 
 // Wait for DOM to be fully loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await initializeDatabases();
     // Get the canvas element with the correct ID
     const canvas = document.getElementById('canvas');
     if (!canvas) {
@@ -29,11 +52,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const circleMetrics = new CircleMetrics(triangleSystem);
     const capacityModule = new CapacityModule(circleMetrics);
     const environmentModule = new EnvironmentModule(intelligenceModule, triangleSystem, environmentDB);
+    
+    // Initialize UptakeSystem with environmentModule
+    const uptakeSystem = new UptakeSystem(environmentModule);
+    console.log('UptakeSystem initialized:', uptakeSystem);
+
+    // Initialize PoolSystem with environmentModule
+    const poolSystem = new PoolSystem(environmentModule);
+    console.log('PoolSystem initialized:', poolSystem);
+
     const rulesModule = new RulesModule(triangleSystem, canvas, ctx, intelligenceModule, environmentModule);
     triangleSystem.rulesModule = rulesModule; // Now set the rulesModule in triangleSystem
 
     // Initialize DataProcessing with the shared database instance
     const dataProcessing = new DataProcessing(environmentModule);
+
+    // Initialize Processing Pool
+    await dataProcessing.initializeProcessingPool();
+    console.log('Processing Pool initialized.');
 
     // Call updateDashboard after rulesModule is available
     triangleSystem.updateDashboard();
@@ -75,83 +111,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const presetManager = new PresetManager(triangleSystem);
     });
 
-    document.addEventListener('DOMContentLoaded', async () => {
-        try {
-            // Initialize databases
-            const environmentDB = new EnvironmentDatabase('UnifiedTriangleDB', ['environmental']);
-            const processingPoolDB = new EnvironmentDatabase('UnifiedTriangleDB', ['processing']);
-
-            // Wait for databases to be ready
-            await Promise.all([
-                environmentDB.ready,
-                processingPoolDB.ready
-            ]);
-
-            // Initialize modules
-            const environmentModule = new EnvironmentModule(environmentDB);
-            
-            const intelligenceModule = new IntelligenceModule();
-            const dataConversion = new DataConversion(intelligenceModule);
-
-            // Add click handler for initialize button
-            const initButton = document.getElementById('initializeButton');
-            if (initButton) {
-                initButton.addEventListener('click', async () => {
-                    console.log('Initialize button clicked - starting clear and init sequence');
-                    
-                    try {
-                        // First ensure environment module is ready and clear existing data
-                        await environmentModule.environmentDB.ready;
-                        const cleared = await environmentModule.clearExistingData();
-                        if (!cleared) {
-                            throw new Error('Failed to clear existing data');
-                        }
-                        
-                        // Calculate metrics
-                        const metrics = await calculateMetrics();
-                        
-                        // Then proceed with capacity module initialization
-                        await initializeCapacityModule(environmentModule, metrics);
-                        
-                        // Then complete environment initialization
-                        await environmentModule.handlingInitialization({
-                            // your initialization state
-                        });
-                        
-                        // Finally reset data processing
-                        await dataProcessing.handleInitialization();
-                        
-                        console.log('System initialization complete');
-                    } catch (error) {
-                        console.error('Error during system initialization:', error);
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Error setting up system:', error);
-        }
-    });
-
     // Add initialize button handler
     document.getElementById('initializeSystem')?.addEventListener('click', async () => {
         try {
             console.log('Initialize button clicked (index.js)');
             
-            // Initialize capacity module first
+            // Initialize capacity module
             const initialState = await capacityModule.initializeSystemData();
             console.log('Capacity Module initialized with state:', {
-                edPercent: initialState.metrics.edPercent,
-                ebPercent: initialState.metrics.ebPercent,
+                
                 usedCapacity: initialState.metrics.usedCapacity,
                 bitsCount: initialState.metrics.bitsCount,
                 noiseCount: initialState.metrics.noiseCount
             });
             
-            // Then update environment module with the state
+            // Update environment module
             await environmentModule.handleInitialization(initialState);
-            
-            // Final dashboard update from capacity module
-            capacityModule.updateDashboard(initialState.metrics);
             
         } catch (error) {
             console.error('Error during initialization:', error);
@@ -160,6 +135,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add data conversion
     const dataConversion = new DataConversion(environmentModule.environmentDB, intelligenceModule);
+
+    const stateModule = new StateModule(triangleSystem);
+
+    const recycleModule = new RecycleModule(environmentDB);
+
+    // Initialize system control
+    const systemControl = new SystemControl();
 });
 
 async function calculateMetrics() {

@@ -179,6 +179,13 @@ export class TriangleSystem {
 
         // Initialize CapacityModule with CircleMetrics
         this.capacityModule = new CapacityModule(this.circleMetrics);
+
+        // Initialize NC lengths
+        this.ncLengths = {
+            nc1: 300,
+            nc2: 300,
+            nc3: 300
+        };
     }  // End of constructor
 
     loadPreset(name, values) {
@@ -4964,6 +4971,97 @@ export class TriangleSystem {
     handleDrag(event) {
         // ... existing drag code ...
         this.notifyMetricsUpdate();
+    }
+
+    // Get current length of an NC
+    getNCLength(ncNumber) {
+        return this.ncLengths[`nc${ncNumber}`] || 0;
+    }
+
+    // Update length of an NC
+    async updateNCLength(ncNumber, newLength) {
+        try {
+            console.log(`TriangleSystem updating NC${ncNumber}:`, {
+                oldLength: this.ncLengths[`nc${ncNumber}`],
+                newLength
+            });
+
+            // Update our internal length tracking
+            this.ncLengths[`nc${ncNumber}`] = newLength;
+
+            // Get the manual input elements
+            const manualInput = document.getElementById(`manual-nc${ncNumber}`);
+            if (manualInput) {
+                // Update the end state value
+                manualInput.value = newLength.toFixed(2);
+                
+                // Create and dispatch an input event to trigger the animation
+                const event = new Event('input', {
+                    bubbles: true,
+                    cancelable: true,
+                });
+                manualInput.dispatchEvent(event);
+
+                // Ensure "End" is selected and "Apply NC" is triggered
+                const applyToEnd = document.getElementById('applyToEnd');
+                const applyToStart = document.getElementById('applyToStart');
+                if (applyToEnd && applyToStart) {
+                    applyToEnd.checked = true;
+                    applyToStart.checked = false;
+                }
+
+                // Trigger the apply button
+                const applyButton = document.getElementById('apply-manual');
+                if (applyButton) {
+                    applyButton.click();
+                }
+            }
+
+            console.log(`NC${ncNumber} update complete:`, {
+                currentLengths: this.ncLengths
+            });
+        } catch (error) {
+            console.error(`Error in updateNCLength for NC${ncNumber}:`, error);
+            throw error;
+        }
+    }
+
+    getCurrentState() {
+        return {
+            pointA: { x: this.pointA.x, y: this.pointA.y },
+            pointB: { x: this.pointB.x, y: this.pointB.y },
+            pointC: { x: this.pointC.x, y: this.pointC.y }
+        };
+    }
+
+    async animateStateChange(startState, endState, duration = 500) {
+        return new Promise((resolve) => {
+            const startTime = performance.now();
+            
+            const animate = (currentTime) => {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Interpolate between start and end states
+                this.pointA.x = this.lerp(startState.pointA.x, endState.pointA.x, progress);
+                this.pointA.y = this.lerp(startState.pointA.y, endState.pointA.y, progress);
+                this.pointB.x = this.lerp(startState.pointB.x, endState.pointB.x, progress);
+                this.pointB.y = this.lerp(startState.pointB.y, endState.pointB.y, progress);
+                this.pointC.x = this.lerp(startState.pointC.x, endState.pointC.x, progress);
+                this.pointC.y = this.lerp(startState.pointC.y, endState.pointC.y, progress);
+                
+                // Redraw
+                this.draw();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    resolve();
+                }
+            };
+            
+            requestAnimationFrame(animate);
+        });
     }
 }
 

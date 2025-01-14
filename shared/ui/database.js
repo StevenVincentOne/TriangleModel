@@ -3,18 +3,25 @@ let instance = null;
 
 export class EnvironmentDatabase {
     #db = null;  // Private field for database
-    stores = ['environment', 'processing', 'converted'];
+    stores = [
+        'environment',
+        'uptake', 
+        'processing', 
+        'converted', 
+        'stateIntake',
+        'stateUpdateNC1',
+        'stateUpdateNC2',
+        'stateUpdateNC3'
+    ];
     debugLogging = false;
 
     constructor() {
         if (EnvironmentDatabase.instance) {
-            
             return EnvironmentDatabase.instance;
         }
 
-        
         this.dbName = 'EnvironmentDB';
-        this.version = 5;
+        this.version = 7;  // Incremented version
         this.ready = this.initializeDatabase();
         this.initializeZeroButton();
 
@@ -24,7 +31,7 @@ export class EnvironmentDatabase {
     async initializeDatabase() {
         try {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('EnvironmentDB', 5);
+                const request = indexedDB.open(this.dbName, this.version);
 
                 request.onupgradeneeded = (event) => {
                     const db = event.target.result;
@@ -34,61 +41,24 @@ export class EnvironmentDatabase {
                         db.createObjectStore('environment', { keyPath: 'id', autoIncrement: true });
                     }
                     
-                    // Rename 'processing' to 'uptake'
-                    if (db.objectStoreNames.contains('processing')) {
-                        const processingData = [];
-                        const transaction = event.target.transaction;
-                        
-                        // Get all data from processing store
-                        const processingStore = transaction.objectStore('processing');
-                        processingStore.getAll().onsuccess = (e) => {
-                            processingData.push(...e.target.result);
-                        };
-                        
-                        db.deleteObjectStore('processing');
-                        const uptakeStore = db.createObjectStore('uptake', { keyPath: 'id', autoIncrement: true });
-                        
-                        // Restore data to new store
-                        processingData.forEach(item => {
-                            uptakeStore.add(item);
-                        });
-                    } else if (!db.objectStoreNames.contains('uptake')) {
-                        db.createObjectStore('uptake', { keyPath: 'id', autoIncrement: true });
-                    }
-                    
-                    // Rename 'convertPool' to 'processingPool'
-                    if (db.objectStoreNames.contains('convertPool')) {
-                        const poolData = [];
-                        const transaction = event.target.transaction;
-                        
-                        // Get all data from convertPool store
-                        const convertPoolStore = transaction.objectStore('convertPool');
-                        convertPoolStore.getAll().onsuccess = (e) => {
-                            poolData.push(...e.target.result);
-                        };
-                        
-                        db.deleteObjectStore('convertPool');
-                        const processingPoolStore = db.createObjectStore('processingPool', { keyPath: 'symbol' });
-                        
-                        // Restore data to new store
-                        poolData.forEach(item => {
-                            processingPoolStore.add(item);
-                        });
-                    } else if (!db.objectStoreNames.contains('processingPool')) {
-                        db.createObjectStore('processingPool', { keyPath: 'symbol' });
-                    }
-                    
-                    if (!db.objectStoreNames.contains('convertedBytes')) {
-                        db.createObjectStore('convertedBytes', { keyPath: 'id', autoIncrement: true });
-                    }
-                    
-                    // Add filteredNoise store
-                    if (!db.objectStoreNames.contains('filteredNoise')) {
-                        db.createObjectStore('filteredNoise', { 
-                            keyPath: 'id', 
-                            autoIncrement: true 
-                        });
-                    }
+                    // Create other stores if they don't exist
+                    const stores = {
+                        'uptake': { keyPath: 'id', autoIncrement: true },
+                        'processingPool': { keyPath: 'symbol' },
+                        'convertedBytes': { keyPath: 'id', autoIncrement: true },
+                        'filteredNoise': { keyPath: 'id', autoIncrement: true },
+                        'stateIntake': { keyPath: 'id', autoIncrement: true },
+                        'stateUpdateNC1': { keyPath: 'id', autoIncrement: true },
+                        'stateUpdateNC2': { keyPath: 'id', autoIncrement: true },
+                        'stateUpdateNC3': { keyPath: 'id', autoIncrement: true }
+                    };
+
+                    Object.entries(stores).forEach(([storeName, config]) => {
+                        if (!db.objectStoreNames.contains(storeName)) {
+                            db.createObjectStore(storeName, config);
+                            console.log(`Created store: ${storeName}`);
+                        }
+                    });
                 };
 
                 request.onsuccess = (event) => {
@@ -182,20 +152,23 @@ export class EnvironmentDatabase {
             const transaction = this.#db.transaction('processingPool', 'readwrite');
             const store = transaction.objectStore('processingPool');
             
-            // Get existing count for this symbol
-            const request = store.get(symbol.symbol);
+            // Get existing count for this symbol AND type combination
+            const request = store.getAll();
             
             return new Promise((resolve, reject) => {
                 request.onsuccess = async () => {
-                    const existingRecord = request.result;
+                    const records = request.result;
+                    const existingRecord = records.find(r => 
+                        r.symbol === symbol.symbol && r.type === symbol.type
+                    );
                     
                     if (existingRecord) {
-                        // Update existing count
+                        // Update existing count only if symbol AND type match
                         existingRecord.count++;
                         const updateRequest = store.put(existingRecord);
                         
                         updateRequest.onsuccess = () => {
-                            console.log(`Updated count for symbol ${symbol.symbol} to ${existingRecord.count}`);
+                            console.log(`Updated count for symbol ${symbol.symbol} (${symbol.type}) to ${existingRecord.count}`);
                             resolve(updateRequest.result);
                         };
                         
@@ -212,7 +185,7 @@ export class EnvironmentDatabase {
                         const addRequest = store.put(newRecord);
                         
                         addRequest.onsuccess = () => {
-                            console.log(`Created new count for symbol ${symbol.symbol}`);
+                            console.log(`Created new count for symbol ${symbol.symbol} (${symbol.type})`);
                             resolve(addRequest.result);
                         };
                         
@@ -292,12 +265,50 @@ export class EnvironmentDatabase {
         }
     }
 
-    async storeConvertedByte(byte) {
-        return this.addToStore('convertedBytes', byte);
+    async storeConvertedBytes(data) {
+        console.log('Storing in convertedBytes:', data); // Logging
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('convertedBytes', 'readwrite');
+            const store = transaction.objectStore('convertedBytes');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.add({
+                    ...data,
+                    timestamp: Date.now()
+                });
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('convertedBytesUpdated', { 
+                        detail: { action: 'add', data }
+                    }));
+                    resolve(request.result);
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error storing converted bytes:', error);
+            throw error;
+        }
     }
 
     async getConvertedBytes() {
-        return this.getAllFromStore('convertedBytes');
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('convertedBytes', 'readonly');
+            const store = transaction.objectStore('convertedBytes');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error getting converted bytes:', error);
+            throw error;
+        }
     }
 
     async deleteProcessedSymbol(id) {
@@ -725,21 +736,23 @@ export class EnvironmentDatabase {
         }
     }
 
-    async storeFilteredNoise(noiseData) {
+    async storeFilteredNoise(symbolData) {
         try {
             await this.ready;
             const transaction = this.#db.transaction('filteredNoise', 'readwrite');
             const store = transaction.objectStore('filteredNoise');
             
             return new Promise((resolve, reject) => {
-                const request = store.add({
-                    ...noiseData,
-                    timestamp: Date.now()
-                });
+                const request = store.add(symbolData);
                 
                 request.onsuccess = () => {
+                    // Dispatch event with the correct store name
                     window.dispatchEvent(new CustomEvent('storeChanged', { 
-                        detail: { store: 'filteredNoise', action: 'add', data: noiseData }
+                        detail: { 
+                            store: 'filteredNoise',
+                            action: 'add',
+                            data: symbolData 
+                        }
                     }));
                     resolve(request.result);
                 };
@@ -790,8 +803,8 @@ export class EnvironmentDatabase {
                 const request = store.delete(id);
                 
                 request.onsuccess = () => {
-                    window.dispatchEvent(new CustomEvent('storeChanged', { 
-                        detail: { store: 'convertedBytes', action: 'delete', id }
+                    window.dispatchEvent(new CustomEvent('convertedBytesUpdated', { 
+                        detail: { action: 'delete', id }
                     }));
                     resolve();
                 };
@@ -925,13 +938,14 @@ export class EnvironmentDatabase {
     }
 
     async setupProcessingPoolConnections() {
-        // Connect processingPool to convertedBytes (for bits)
+        // Connect processingPool to convertedBytes for 'bit'
         const poolToBytes = await this.connectStores(
             'processingPool',
             'convertedBytes',
             async (data) => {
                 if (Array.isArray(data)) {
                     const bitRecords = data.filter(record => record.type === 'bit');
+                    console.log('Processing bits:', bitRecords); // Logging
                     for (const record of bitRecords) {
                         if (record.count > 0) {
                             await this.storeConvertedBytes({
@@ -942,6 +956,7 @@ export class EnvironmentDatabase {
                         }
                     }
                 } else if (data.type === 'bit' && data.count > 0) {
+                    console.log('Processing single bit:', data); // Logging
                     await this.storeConvertedBytes({
                         symbol: data.symbol,
                         count: data.count,
@@ -951,27 +966,29 @@ export class EnvironmentDatabase {
             }
         );
 
-        // Connect processingPool to filteredNoise (for noise)
-        const poolToNoise = await this.connectStores(
+        // Connect processingPool to convertedBytes for 'entropy'
+        const poolToEntropy = await this.connectStores(
             'processingPool',
-            'filteredNoise',
+            'convertedBytes',
             async (data) => {
                 if (Array.isArray(data)) {
-                    const noiseRecords = data.filter(record => record.type === 'noise');
-                    for (const record of noiseRecords) {
+                    const entropyRecords = data.filter(record => record.type === 'noise');
+                    console.log('Processing entropy:', entropyRecords); // Logging
+                    for (const record of entropyRecords) {
                         if (record.count > 0) {
-                            await this.storeFilteredNoise({
+                            await this.storeConvertedBytes({
                                 symbol: record.symbol,
                                 count: record.count,
-                                type: 'noise'
+                                type: 'entropy'  // Store as entropy in convertedBytes
                             });
                         }
                     }
                 } else if (data.type === 'noise' && data.count > 0) {
-                    await this.storeFilteredNoise({
+                    console.log('Processing single entropy:', data); // Logging
+                    await this.storeConvertedBytes({
                         symbol: data.symbol,
                         count: data.count,
-                        type: 'noise'
+                        type: 'entropy'  // Store as entropy in convertedBytes
                     });
                 }
             }
@@ -980,8 +997,164 @@ export class EnvironmentDatabase {
         // Return cleanup functions
         return () => {
             poolToBytes();
-            poolToNoise();
+            poolToEntropy();
         };
+    }
+
+    async storeStateIntakeSymbol(symbolData) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('stateIntake', 'readwrite');
+            const store = transaction.objectStore('stateIntake');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.add({
+                    ...symbolData,
+                    timestamp: Date.now()
+                });
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('stateIntakeUpdated', { 
+                        detail: { action: 'add', data: symbolData }
+                    }));
+                    resolve(request.result);
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error storing state intake symbol:', error);
+            throw error;
+        }
+    }
+
+    async getStateIntakeSymbols() {
+        return this.getAllFromStore('stateIntake');
+    }
+
+    async deleteStateIntakeSymbol(id) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('stateIntake', 'readwrite');
+            const store = transaction.objectStore('stateIntake');
+            
+            return new Promise((resolve, reject) => {
+                const request = store.delete(id);
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('stateIntakeUpdated', { 
+                        detail: { action: 'delete', id }
+                    }));
+                    resolve();
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error deleting state intake symbol:', error);
+            throw error;
+        }
+    }
+
+    async clearAllStores() {
+        const stores = ['environment', 'processing', 'uptake', 'processingPool', 'convertedBytes', 'filteredNoise', 'stateIntake'];
+        for (const storeName of stores) {
+            try {
+                await this.clearStore(storeName);
+                console.log(`Cleared store: ${storeName}`);
+            } catch (error) {
+                console.error(`Error clearing store ${storeName}:`, error);
+            }
+        }
+    }
+
+    // Add methods for the new stores
+    async storeStateUpdateNC(ncNumber, symbolData) {
+        const storeName = `stateUpdateNC${ncNumber}`;
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            
+            return new Promise((resolve, reject) => {
+                const request = store.add({
+                    ...symbolData,
+                    timestamp: Date.now()
+                });
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('stateUpdateNCUpdated', { 
+                        detail: { 
+                            nc: ncNumber,
+                            action: 'add', 
+                            data: symbolData 
+                        }
+                    }));
+                    resolve(request.result);
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error(`Error storing state update NC${ncNumber} symbol:`, error);
+            throw error;
+        }
+    }
+
+    async getStateUpdateNCSymbols(ncNumber) {
+        return this.getAllFromStore(`stateUpdateNC${ncNumber}`);
+    }
+
+    async deleteStateUpdateNCSymbol(ncNumber, id) {
+        const storeName = `stateUpdateNC${ncNumber}`;
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            
+            return new Promise((resolve, reject) => {
+                const request = store.delete(id);
+                
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('stateUpdateNCUpdated', { 
+                        detail: { 
+                            nc: ncNumber,
+                            action: 'delete', 
+                            id 
+                        }
+                    }));
+                    resolve();
+                };
+                
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error(`Error deleting state update NC${ncNumber} symbol:`, error);
+            throw error;
+        }
+    }
+
+    async getFilteredNoiseCount() {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('filteredNoise', 'readonly');
+            const store = transaction.objectStore('filteredNoise');
+            return new Promise((resolve, reject) => {
+                const request = store.getAll();
+                request.onsuccess = () => {
+                    const allRecords = request.result;
+                    const totalCount = allRecords.reduce((sum, record) => sum + (record.count || 0), 0);
+                    resolve(totalCount);
+                };
+                request.onerror = () => {
+                    console.error('Error fetching filteredNoise records:', request.error);
+                    reject(request.error);
+                };
+            });
+        } catch (error) {
+            console.error('Database: Error in getFilteredNoiseCount:', error);
+            throw error;
+        }
     }
 }
 

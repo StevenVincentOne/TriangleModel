@@ -1,9 +1,16 @@
-export class CapacityManager {
+export class StateCapacity {
     constructor(triangleSystem) {
         this.triangleSystem = triangleSystem;
         this.currentCapacity = 0;
         this.maxCapacity = 0;
         this.threshold = null;
+        
+        // Set up capacity warning thresholds first
+        this.warningThresholds = {
+            high: 0.9,   // 90% capacity
+            medium: 0.7, // 70% capacity
+            low: 0.5    // 50% capacity
+        };
         
         // Enhanced data storage with subsystem tracking
         this.dataStore = {
@@ -32,22 +39,103 @@ export class CapacityManager {
         // Event tracking
         this.capacityEvents = [];
         
-        // Initialize capacity based on triangle area
+        // Initialize capacity based on triangle area (C)
         this.updateMaxCapacity();
-        
-        // Set up capacity warning thresholds
-        this.warningThresholds = {
-            high: 0.9,   // 90% capacity
-            medium: 0.7, // 70% capacity
-            low: 0.5    // 50% capacity
-        };
     }
 
     updateMaxCapacity() {
-        const area = this.triangleSystem.calculateArea();
-        this.maxCapacity = this.threshold || area;
+        // Get C (total triangle area) from triangleSystem
+        const totalCapacity = this.triangleSystem.calculateArea();
+        this.maxCapacity = this.threshold || totalCapacity;
+        
+        // Get ssc (subsystem capacity) which is C/3
+        this.subsystemCapacity = totalCapacity / 3;
+        
+        // Update displays
+        this.updateCapacityDisplays();
         this.checkCapacityThresholds();
-        return this.maxCapacity;
+        
+        return {
+            totalCapacity: this.maxCapacity,
+            subsystemCapacity: this.subsystemCapacity
+        };
+    }
+
+    // New method to check subsystem capacity
+    hasSubsystemCapacity(subsystem, amount = 1) {
+        const currentSubsystemUsage = this.getSubsystemUsage(subsystem);
+        return (currentSubsystemUsage + amount) <= this.subsystemCapacity;
+    }
+
+    // Modified addData method to check both total and subsystem capacity
+    async addData(type, subsystem, amount = 1, metadata = {}) {
+        if (!this.hasCapacity(amount)) {
+            this.logCapacityEvent('total_capacity_full', {
+                attempted_type: type,
+                attempted_subsystem: subsystem,
+                attempted_amount: amount
+            });
+            throw new Error(`System at total capacity (${this.getCapacityPercentage()}%) - cannot add more ${type}`);
+        }
+
+        if (!this.hasSubsystemCapacity(subsystem, amount)) {
+            this.logCapacityEvent('subsystem_capacity_full', {
+                attempted_type: type,
+                attempted_subsystem: subsystem,
+                attempted_amount: amount
+            });
+            throw new Error(`Subsystem ${subsystem} at capacity - cannot add more ${type}`);
+        }
+
+        if (!this.dataStore[type]?.[subsystem]) {
+            throw new Error(`Invalid type "${type}" or subsystem "${subsystem}"`);
+        }
+
+        const dataEntry = {
+            timestamp: Date.now(),
+            value: 1,
+            subsystem,
+            ...metadata
+        };
+
+        for (let i = 0; i < amount; i++) {
+            this.dataStore[type][subsystem].push(dataEntry);
+        }
+
+        this.logCapacityEvent('data_added', {
+            type,
+            subsystem,
+            amount,
+            metadata
+        });
+
+        await this.updateCapacityDisplays();
+        return true;
+    }
+
+    async updateCapacityDisplays() {
+        // Update C display
+        const systemCapacityDisplay = document.getElementById('system-c');
+        if (systemCapacityDisplay) {
+            systemCapacityDisplay.value = this.maxCapacity.toFixed(2);
+        }
+
+        // Update ssc display
+        const subsystemCapacityDisplay = document.getElementById('subsystem-1-area');
+        if (subsystemCapacityDisplay) {
+            subsystemCapacityDisplay.value = this.subsystemCapacity.toFixed(2);
+        }
+
+        // Update usage statistics
+        const stats = this.getStats();
+        window.dispatchEvent(new CustomEvent('capacityUpdate', { 
+            detail: { 
+                totalCapacity: this.maxCapacity,
+                subsystemCapacity: this.subsystemCapacity,
+                currentUsage: stats.usedCapacity,
+                subsystemUsage: stats.subsystems
+            }
+        }));
     }
 
     getCurrentUsage() {
@@ -75,42 +163,6 @@ export class CapacityManager {
 
     hasCapacity(amount = 1) {
         return (this.getCurrentUsage() + amount) <= this.maxCapacity;
-    }
-
-    addData(type, subsystem, amount = 1, metadata = {}) {
-        if (!this.hasCapacity(amount)) {
-            this.logCapacityEvent('capacity_full', {
-                attempted_type: type,
-                attempted_subsystem: subsystem,
-                attempted_amount: amount
-            });
-            throw new Error(`System at capacity (${this.getCapacityPercentage()}%) - cannot add more ${type}`);
-        }
-
-        if (!this.dataStore[type]?.[subsystem]) {
-            throw new Error(`Invalid type "${type}" or subsystem "${subsystem}"`);
-        }
-
-        const dataEntry = {
-            timestamp: Date.now(),
-            value: 1,
-            subsystem,
-            ...metadata
-        };
-
-        for (let i = 0; i < amount; i++) {
-            this.dataStore[type][subsystem].push(dataEntry);
-        }
-
-        this.logCapacityEvent('data_added', {
-            type,
-            subsystem,
-            amount,
-            metadata
-        });
-
-        this.checkCapacityThresholds();
-        return true;
     }
 
     // Convenience methods for adding specific types of data

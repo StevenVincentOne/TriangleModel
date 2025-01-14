@@ -20,8 +20,8 @@ export class EnvironmentModule {
         this.addFlowRateEventListeners();
         
         // Updated alphabet: 26 letters plus 4 special characters (30 total characters)
-        this.alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ/+&∅';
-        this.noiseAlphabet = 'αβχδεφγηιξκλμνοπψρστυϑωχψζςΣΩθ';
+        this.alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ∅';
+        this.noiseAlphabet = 'αβςδεφγηιξκλμνοπϱρστυϑωχψζθ';
         
         this.randomGenerator = {
             generateLetter: () => {
@@ -343,13 +343,15 @@ export class EnvironmentModule {
             cc3: metrics.cc3,
             edPercent: parseFloat(document.getElementById('ed-percent')?.value || 0),
             ebPercent: parseFloat(document.getElementById('eb-percent')?.value || 0),
+            enPercent: 100 - parseFloat(document.getElementById('eb-percent')?.value || 0),
             bitsCount: parseFloat(this.dashboardElements.environmentalBits?.value || 0),
             noiseCount: parseFloat(this.dashboardElements.environmentalNoise?.value || 0)
         };
 
         // Update Environmental Data values and notify CapacityModule
         if (this.triangleSystem.capacityModule) {
-            this.triangleSystem.capacityModule.updateDashboard(dashboardData);
+            // Preserve existing percentages during update
+            this.triangleSystem.capacityModule.updateDashboard(dashboardData, true);
         }
     }
 
@@ -396,6 +398,7 @@ export class EnvironmentModule {
                 cc3: metrics.cc3,
                 edPercent: parseFloat(document.getElementById('ed-percent')?.value || 0),
                 ebPercent: parseFloat(document.getElementById('eb-percent')?.value || 0),
+                enPercent: 100 - parseFloat(document.getElementById('eb-percent')?.value || 0),
                 bitsCount: parseFloat(this.dashboardElements.environmentalBits?.value || 0),
                 noiseCount: parseFloat(this.dashboardElements.environmentalNoise?.value || 0)
             };
@@ -412,7 +415,7 @@ export class EnvironmentModule {
 
     // Add method to handle environmental data changes
     handleEnvironmentalDataChange() {
-        console.log('handleEnvironmentalDataChange: Triggered');
+        
         const metrics = this.triangleSystem?.circleMetrics?.calculateExternalRegions();
         if (!metrics) {
             console.warn('handleEnvironmentalDataChange: No metrics available');
@@ -427,15 +430,16 @@ export class EnvironmentModule {
             cc3: metrics.cc3,
             edPercent: parseFloat(document.getElementById('ed-percent')?.value || 0),
             ebPercent: parseFloat(document.getElementById('eb-percent')?.value || 0),
+            enPercent: 100 - parseFloat(document.getElementById('eb-percent')?.value || 0),
             bitsCount: parseFloat(this.dashboardElements.environmentalBits?.value || 0),
             noiseCount: parseFloat(this.dashboardElements.environmentalNoise?.value || 0)
         };
 
-        console.log('handleEnvironmentalDataChange: Dashboard Data Prepared', dashboardData);
+        
 
         if (this.triangleSystem?.capacityModule) {
             this.triangleSystem.capacityModule.updateDashboard(dashboardData);
-            console.log('handleEnvironmentalDataChange: CapacityModule.updateDashboard called');
+            
         } else {
             console.warn('handleEnvironmentalDataChange: CapacityModule not found');
         }
@@ -616,17 +620,17 @@ export class EnvironmentModule {
         if (edInput) {
             edInput.value = totalData.toFixed(2);
             edInput.dispatchEvent(new Event('change'));
-            console.log(`EnvironmentModule: Updated system-ed to ${edInput.value}`);
+            
         }
         if (ebInput) {
             ebInput.value = totalBits.toFixed(2);
             ebInput.dispatchEvent(new Event('change'));
-            console.log(`EnvironmentModule: Updated system-eb to ${ebInput.value}`);
+            
         }
         if (enInput) {
             enInput.value = totalNoise.toFixed(2);
             enInput.dispatchEvent(new Event('change'));
-            console.log(`EnvironmentModule: Updated system-en to ${enInput.value}`);
+            
         }
     }
 

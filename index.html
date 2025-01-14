@@ -70,41 +70,29 @@
                             <input id="manual-ic3" type="text" class="manual-input" maxlength="6">
                         </div>
                         <button id="apply-manual-ic" class="btn btn-info">Apply IC</button>
+                        <button id="saveState" class="btn btn-primary btn-sm">Save State</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Preset buttons and dropdowns container -->
-            <div class="preset-buttons-container">
-                <!-- Standard preset buttons -->
-                <button id="equilateral" class="btn btn-secondary btn-sm">Equilateral</button>
-                <button id="isosceles" class="btn btn-secondary btn-sm">Isosceles</button>
-                <button id="scalene" class="btn btn-secondary btn-sm">Scalene</button>
-                <button id="right" class="btn btn-secondary btn-sm">Right</button>
-                <button id="acute" class="btn btn-secondary btn-sm">Acute</button>
-                <button id="obtuse" class="btn btn-secondary btn-sm">Obtuse</button>
-                
-                <!-- Add Save button -->
-                <button id="save-preset" class="btn btn-success btn-sm">Save Preset</button>
-                
-                <!-- Moved dropdowns -->
-                <div class="dropdown">
-                    <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="userPresetsDropdown" data-bs-toggle="dropdown">
-                        User Presets
-                    </button>
-                    <ul class="dropdown-menu" id="userPresetsList">
-                        <!-- User presets will be added here dynamically -->
-                    </ul>
-                </div>
-                <div class="dropdown">
-                    <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="animationsDropdown" data-bs-toggle="dropdown">
-                        Animations
-                    </button>
-                    <ul class="dropdown-menu" id="animationsList">
-                        <!-- Animations will be added here dynamically -->
-                    </ul>
+            <!-- Animation Controls Row -->
+            <div class="animation-controls-row d-flex align-items-center gap-2 my-3">
+                <label class="mb-0">Start</label>
+                <input id="animation-nc1-start" type="text" class="form-control compact-input" maxlength="6">
+                <input id="animation-nc2-start" type="text" class="form-control compact-input" maxlength="6">
+                <input id="animation-nc3-start" type="text" class="form-control compact-input" maxlength="6">
+                <label class="mb-0">End</label>
+                <input id="animation-nc1-end" type="text" class="form-control compact-input" maxlength="6">
+                <input id="animation-nc2-end" type="text" class="form-control compact-input" maxlength="6">
+                <input id="animation-nc3-end" type="text" class="form-control compact-input" maxlength="6">
+                <button id="animate-button-end" class="btn btn-info btn-sm">Animate</button>
+                <button id="save-animation-end" class="btn btn-info btn-sm">Save</button>
+                <div class="form-check d-flex align-items-center gap-1 mb-0">
+                    <input type="checkbox" id="animation-loop" class="form-check-input">
+                    <label for="animation-loop" class="form-check-label mb-0">Loop</label>
                 </div>
             </div>
+
             <!-- Info Box Container -->
             <div class="info-box-container">
                 <!-- First Metric -->
@@ -133,50 +121,49 @@
                 <div class="info-display">
                     <input id="info-display-value-3" type="text" readonly>
                 </div>
-
-                <!-- Single Update Button -->
-                <button id="info-display-update" class="btn btn-info btn-sm">Update</button>
             </div>
 
-            <!-- Canvas and Animation Controls -->
+            <!-- Left Environment Panel In Controls -->
             <div class="d-flex align-items-start gap-2">
-                <!-- Left Animation Panel -->
-                <div class="animation-panel bg-dark p-2 rounded">
+                <!-- Left Environment Panel -->
+                <div class="animation-panel left-panel bg-dark p-2 rounded">
                     <!-- System Controls Buttons -->
-                    <div class="intelligence-controls">
+                    <div class="intelligence-controls compact-controls">
                         <div class="initialize-row">
-                            <button id="initializeSystem" class="btn">Init</button>
+                            <button id="initializeSystem" class="btn btn-sm compact-btn">Init</button>
                             <div class="random-control">
-                                <input type="checkbox" id="randomize-data" checked>
-                                <label for="randomize-data">Random</label>
+                                <input type="checkbox" id="randomize-data">
+                                <label for="randomize-data" class="small-text">Random</label>
                             </div>
                         </div>
                         <div class="zero-controls">
-                            <button id="zeroDataButton" class="btn">Zero</button>
+                            <button id="zeroDataButton" class="btn btn-sm compact-btn">Zero</button>
                             <div class="store-checkboxes">
                                 <div class="store-checkbox">
                                     <input type="checkbox" id="zero-environment" checked>
-                                    <label for="zero-environment">E</label>
+                                    <label for="zero-environment" class="small-text">E</label>
                                 </div>
                                 <div class="store-checkbox">
                                     <input type="checkbox" id="zero-processing" checked>
-                                    <label for="zero-processing">U</label>
+                                    <label for="zero-processing" class="small-text">U</label>
                                 </div>
                                 <div class="store-checkbox">
                                     <input type="checkbox" id="zero-converted" checked>
-                                    <label for="zero-converted">P</label>
+                                    <label for="zero-converted" class="small-text">P</label>
                                 </div>
                                 <div class="store-checkbox">
                                     <input type="checkbox" id="zero-conv-bytes" checked>
-                                    <label for="zero-conv-bytes">C</label>
+                                    <label for="zero-conv-bytes" class="small-text">C</label>
                                 </div>
                             </div>
                         </div>
                         <div class="button-row">
-                            <button id="systemButton" class="btn">System</button>
-                            <button id="processDataButton" class="btn">Uptake</button>
-                            <button id="letterFlowToggle" class="btn">Pool</button>
+                            <button id="systemButton" class="btn btn-sm compact-btn">System</button>
+                            <button id="uptakeButton" class="btn btn-sm compact-btn">Uptake</button>
+                            <button id="poolButton" class="btn btn-sm compact-btn">Pool</button>
                         </div>
+                        
+                        
                     </div>
                     <!-- System Internal Data Controls -->
                     <div class="system-intelligence-inputs mt-3">
@@ -203,50 +190,50 @@
 
                         <!-- Uptake Pool Inputs and Controls -->
                          <div class="input-row">
-                            <label for="pb-loss-rate">UB Loss %</label>
+                            <label for="ub-loss-rate">UB Loss %</label>
                             <input type="number" id="uptake-loss-%" min="0" max="100" value="0">
                         </div>
                         <div class="input-row">
-                            <label for="process-d">UD</label>
-                            <input id="process-d" type="text" readonly value="0">
-                            <label for="flow-rate">R</label>
-                            <input type="number" id="flow-rate" min="0" max="1000" value="10" step="1">
+                            <label for="uptake-d">UD</label>
+                            <input id="uptake-d" type="text" readonly value="0">
+                            <label for="uptake-flow-rate">R</label>
+                            <input type="number" id="uptake-flow-rate" min="0" max="1000" value="10" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="process-b">UB</label>
-                            <input id="process-b" type="text" readonly value="0">
-                            <label for="pb-flow-rate">%</label>
-                            <input type="number" id="pb-flow-rate" min="0" max="100" value="50" step="1">
+                            <label for="uptake-b">UB</label>
+                            <input id="uptake-b" type="text" readonly value="0">
+                            <label for="uptake-b-flow-rate">%</label>
+                            <input type="number" id="uptake-b-flow-rate" min="0" max="100" value="50" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="process-n">UN</label>
-                            <input id="process-n" type="text" readonly value="0">
-                            <label for="pn-flow-rate">%</label>
-                            <input type="number" id="pn-flow-rate" min="0" max="100" value="50" step="1" readonly>
+                            <label for="uptake-n">UN</label>
+                            <input id="uptake-n" type="text" readonly value="0">
+                            <label for="uptake-n-flow-rate">%</label>
+                            <input type="number" id="uptake-n-flow-rate" min="0" max="100" value="50" step="1" readonly>
                         </div>
 
                         <!--Processing Pool Data Inputs and Controls -->
                         <div class="input-row">
-                            <label for="pb-loss-rate">PB Loss %</label>
-                            <input type="number" id="pb-loss-rate" min="0" max="100" value="0">
+                            <label for="pb-loss-%">PB Loss %</label>
+                            <input type="number" id="pb-loss-%" min="0" max="100" value="0">
                         </div>
                         <div class="input-row">
-                            <label for="procpool-d">PD</label>
-                            <input id="procpool-d" type="text" readonly value="0">
-                            <label for="conversion-rate">R</label>
-                            <input type="number" id="conversion-rate" min="0" max="1000" value="10" step="1">
+                            <label for="pool-d">PD</label>
+                            <input id="pool-d" type="text" readonly value="0">
+                            <label for="pool-flow-rate">R</label>
+                            <input type="number" id="pool-flow-rate" min="0" max="1000" value="10" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="procpool-b">PB</label>
-                            <input id="procpool-b" type="text" readonly value="0">
-                            <label for="proc-b-flow-rate">%</label>
-                            <input type="number" id="proc-b-flow-rate" min="0" max="100" value="50" step="1">
+                            <label for="pool-b">PB</label>
+                            <input id="pool-b" type="text" readonly value="0">
+                            <label for="pool-b-%">%</label>
+                            <input type="number" id="pool-b-%" min="0" max="100" value="50" step="1">
                         </div>
                         <div class="input-row">
-                            <label for="procpool-n">PN</label>
-                            <input id="procpool-n" type="text" readonly value="0">
-                            <label for="proc-n-flow-rate">%</label>
-                            <input type="number" id="proc-n-flow-rate" min="0" max="100" value="50" step="1">
+                            <label for="pool-n">PN</label>
+                            <input id="pool-n" type="text" readonly value="0">
+                            <label for="pool-n-%">%</label>
+                            <input type="number" id="pool-n-%" min="0" max="100" value="50" step="1">
                         </div>
                         
                         <!-- Convert and Filter Buttons with Controls -->
@@ -258,15 +245,19 @@
                             <label for="noise-filter-1">NF1</label>
                             <input type="number" id="noise-filter-1" min="0" max="100" value="0"> 
                         </div>
-                        <div class="button-row intelligence-controls" style="display: flex; gap: 2px; justify-content: space-between;">
-                            <div style="display: flex; align-items: center; gap: 2px;">
-                                <button id="convertBitsButton" class="btn">Convert</button>
-                                <label for="byte-convert-rate">BR</label>
-                                <input type="number" id="byte-convert-rate" min="0" max="100" value="8" 
-                                    style="width: 40px; text-align: center;">
-                                <label for="entropy-convert-rate">ER</label>
-                                <input type="number" id="entropy-convert-rate" min="0" max="100" value="8" 
-                                    style="width: 40px; text-align: center;">
+                        <div class="button-row intelligence-controls">
+                            <div class="d-flex align-items-center gap-1">
+                                <button id="convertBitsButton" class="btn btn-sm compact-btn">Convert</button>
+                                <div class="d-flex align-items-center">
+                                    <label for="byte-convert-rate" class="small-text me-1">BR</label>
+                                    <input type="number" id="byte-convert-rate" min="0" max="100" value="8" 
+                                        class="two-char-input form-control">
+                                </div>
+                                <div class="d-flex align-items-center">
+                                    <label for="entropy-convert-rate" class="small-text me-1">ER</label>
+                                    <input type="number" id="entropy-convert-rate" min="0" max="100" value="8" 
+                                        class="two-char-input form-control">
+                                </div>
                             </div>
                         </div>
 
@@ -292,10 +283,10 @@
 
                         <!-- Noise Recycle Controls -->
                         <div class="button-row intelligence-controls" style="display: flex; flex-direction: row; gap: 2px; align-items: center;">
-                            <button id="recycleNoiseButton" class="btn">Recycle</button>
-                            <label for="noise-recycle-rate">Rate</label>
+                            <button id="recycleNoiseButton" class="btn btn-sm compact-btn">Recycle</button>
+                            <label for="noise-recycle-rate" class="small-text">Rate</label>
                             <input type="number" id="noise-recycle-rate" min="0" max="100" value="10" 
-                                style="width: 40px; text-align: center;">
+                                class="compact-input">
                         </div>
                     </div>
                 </div>
@@ -305,49 +296,183 @@
                     <canvas id="canvas"></canvas>
                 </div>
 
-                <!-- Right Controls Panel -->
-                <div class="controls-panel bg-dark p-2 rounded">
-                    <div class="animation-inputs-grid">
-                        <div class="grid-header">Start</div>
-                        <div class="grid-header">End</div>
-                        
-                        <input id="animation-nc1-start" type="text" class="form-control compact-input" maxlength="6">
-                        <input id="animation-nc1-end" type="text" class="form-control compact-input" maxlength="6">
-                        
-                        <input id="animation-nc2-start" type="text" class="form-control compact-input" maxlength="6">
-                        <input id="animation-nc2-end" type="text" class="form-control compact-input" maxlength="6">
-                        
-                        <input id="animation-nc3-start" type="text" class="form-control compact-input" maxlength="6">
-                        <input id="animation-nc3-end" type="text" class="form-control compact-input" maxlength="6">
-                    </div>
-                    
-                    <!-- Animation Controls -->
-                    <div class="animation-controls mt-2">
-                        <div class="controls-row">
-                            <button id="animate-button-end" class="btn btn-info btn-sm">Animate</button>
-                            <button id="save-animation-end" class="btn btn-info btn-sm">Save</button>
-                        </div>
-                        <div class="controls-row">
-                            <input type="checkbox" id="animation-loop" class="form-check-input">
-                            <label for="animation-loop" class="form-check-label">Loop</label>
+                <!-- Right Environment Panel -->
+                <div class="animation-panel right-panel bg-dark p-2 rounded">
+                    <!-- State Controls Buttons -->
+                    <div class="intelligence-controls compact-controls" style="display: flex; justify-content: flex-start;">
+                        <div class="button-row">
+                            <button id="intakeStateButton" class="btn btn-sm compact-btn">Intake</button>
+                            <button id="stateUpdateButton" class="btn btn-sm compact-btn">Update</button>
+                            
                         </div>
                     </div>
-                    <!-- Data Management Section -->
-                    <div class="data-controls-section">
-                        <button id="saveState" class="btn btn-primary btn-sm w-100 mb-2">Save State</button>
-                        <button id="exportImage" class="btn btn-primary btn-sm w-100 mb-2">Export Image</button>
-                        <button id="exportData" class="btn btn-primary btn-sm w-100 mb-2">Export Data</button>
-                        <button id="importButton" class="btn btn-primary btn-sm w-100">Import Data</button>
-                        <input type="file" id="importFile" style="display: none;" accept=".csv">
+                    
+                    <!-- State Data Inputs and Controls -->
+                    <div class="system-intelligence-inputs mt-3" style="margin-left: 0;">
+                        <!-- State Data Inputs and Controls -->
+                        <div class="input-row">
+                            <label for="system-d">SD</label>
+                            <input id="system-d" type="text" readonly value="0">
+                            <label for="sd-rate">R</label>
+                            <input type="number" id="sd-rate" min="0" max="1000" value="10" step="1">
+                        </div>
+                        <div class="input-row">
+                            <label for="system-b">SB</label>
+                            <input id="system-b" type="text" readonly value="0">
+                            <label for="sb-percent">%</label>
+                            <input type="number" id="sb-percent" min="0" max="100" value="50">
+                        </div>
+                        <div class="input-row">
+                            <label for="system-e">SE</label>
+                            <input id="system-e" type="text" readonly value="0">
+                            <label for="se-percent">%</label>
+                            <input type="number" id="se-percent" min="0" max="100" value="50">
+                        </div>
+                        <!-- Loss Rate Controls -->
+                        <div class="loss-rate-section">
+                            <div class="nc-loss">
+                                <label for="nc1-loss-rate">Loss % NC1</label>
+                                <input type="number" id="nc1-loss-rate" min="0" max="100" value="0">
+                            </div>
+                            <div class="nc-loss">
+                                <label for="nc2-loss-rate">Loss % NC2</label>
+                                <input type="number" id="nc2-loss-rate" min="0" max="100" value="0">
+                            </div>
+                            <div class="nc-loss">
+                                <label for="nc3-loss-rate">Loss % NC3</label>
+                                <input type="number" id="nc3-loss-rate" min="0" max="100" value="0">
+                            </div>
+                        </div>
+                        
+                        <!-- NC1 Inputs and Controls -->
+                        <div class="nc-controls" style="margin-left: 0;">
+                            <div class="input-row">
+                                <label for="nc1-d">NC1D</label>
+                                <input id="nc1-d" type="text" readonly value="0">
+                                <label for="nc1-rate">R</label>
+                                <input type="number" id="nc1-rate" min="0" max="1000" value="10" step="1">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc1-b">NC1B</label>
+                                <input id="nc1-b" type="text" readonly value="0">
+                                <label for="nc1b-percent">%</label>
+                                <input type="number" id="nc1b-percent" min="0" max="100" value="50">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc1-e">NC1E</label>
+                                <input id="nc1-e" type="text" readonly value="0">
+                                <label for="nc1e-percent">%</label>
+                                <input type="number" id="nc1e-percent" min="0" max="100" value="50">
+                            </div>
+                        </div>
+                        <!-- NC2 Controls -->
+                        <div class="nc-controls" style="margin-left: 0;">
+                            <div class="input-row">
+                                <label for="nc2-d">NC2D</label>
+                                <input id="nc2-d" type="text" readonly value="0">
+                                <label for="nc2-rate">R</label>
+                                <input type="number" id="nc2-rate" min="0" max="1000" value="10" step="1">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc2-b">NC2B</label>
+                                <input id="nc2-b" type="text" readonly value="0">
+                                <label for="nc2b-percent">%</label>
+                                <input type="number" id="nc2b-percent" min="0" max="100" value="50">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc2-e">NC2E</label>
+                                <input id="nc2-e" type="text" readonly value="0">
+                                <label for="nc2e-percent">%</label>
+                                <input type="number" id="nc2e-percent" min="0" max="100" value="50">
+                            </div>
+                        </div>
+                        <!-- NC3 Controls -->
+                        <div class="nc-controls" style="margin-left: 0;">
+                            <div class="input-row">
+                                <label for="nc3-d">NC3D</label>
+                                <input id="nc3-d" type="text" readonly value="0">
+                                <label for="nc3-rate">R</label>
+                                <input type="number" id="nc3-rate" min="0" max="1000" value="10" step="1">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc3-b">NC3B</label>
+                                <input id="nc3-b" type="text" readonly value="0">
+                                <label for="nc3b-percent">%</label>
+                                <input type="number" id="nc3b-percent" min="0" max="100" value="50">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc3-e">NC3E</label>
+                                <input id="nc3-e" type="text" readonly value="0">
+                                <label for="nc3e-percent">%</label>
+                                <input type="number" id="nc3e-percent" min="0" max="100" value="50">
+                            </div>
+                        </div>
+
+                        <!-- Run Controls -->
+                        <div class="nc-controls" style="margin-left: 0;">
+                            <div class="input-row">
+                                <button id="stateRunButton" class="btn btn-sm compact-btn">Run</button>
+                                <label for="run-rate">R</label>
+                                <input type="number" id="run-rate" min="0" max="1000" value="10" step="1">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc1-run-rate">NC1</label>
+                                <input type="number" id="nc1-run-rate" min="0" max="1000" value="10" step="1">
+                                <label for="nc1-run-count">Sent</label>
+                                <input type="text" id="nc1-run-count" readonly value="0">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc2-run-rate">NC2</label>
+                                <input type="number" id="nc2-run-rate" min="0" max="1000" value="10" step="1">
+                                <label for="nc2-run-count">Sent</label>
+                                <input type="text" id="nc2-run-count" readonly value="0">
+                            </div>
+                            <div class="input-row">
+                                <label for="nc3-run-rate">NC3</label>
+                                <input type="number" id="nc3-run-rate" min="0" max="1000" value="10" step="1">
+                                <label for="nc3-run-count">Sent</label>
+                                <input type="text" id="nc3-run-count" readonly value="0">
+                            </div>
+                        </div>
                     </div>
-                    
-                    
                 </div>
             </div>
 
-            <!-- Add this section after the canvas and animation controls -->
+            <!-- After canvas and animation controls -->
             <div class="d-flex justify-content-center gap-2 mt-3">
-                <!-- Feature Toggle Buttons -->
+                <!-- Preset buttons and dropdowns container -->
+                <div class="preset-buttons-container d-flex flex-wrap justify-content-center gap-2">
+                    <!-- Standard preset buttons -->
+                    <button id="equilateral" class="btn btn-secondary btn-sm">Equilateral</button>
+                    <button id="isosceles" class="btn btn-secondary btn-sm">Isosceles</button>
+                    <button id="scalene" class="btn btn-secondary btn-sm">Scalene</button>
+                    <button id="right" class="btn btn-secondary btn-sm">Right</button>
+                    <button id="acute" class="btn btn-secondary btn-sm">Acute</button>
+                    <button id="obtuse" class="btn btn-secondary btn-sm">Obtuse</button>
+                    
+                    <!-- Save button -->
+                    <button id="save-preset" class="btn btn-success btn-sm">Save Preset</button>
+                    
+                    <!-- Dropdowns -->
+                    <div class="dropdown">
+                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="userPresetsDropdown" data-bs-toggle="dropdown">
+                            User Presets
+                        </button>
+                        <ul class="dropdown-menu" id="userPresetsList">
+                        </ul>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="animationsDropdown" data-bs-toggle="dropdown">
+                            Animations
+                        </button>
+                        <ul class="dropdown-menu" id="animationsList">
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature Toggle Buttons -->
+            <div class="d-flex justify-content-center gap-2 mt-3">
                 <div class="feature-buttons-container d-flex flex-column align-items-center gap-2">
                     <!-- Centers Row -->
                     <div class="d-flex flex-wrap justify-content-center gap-2">
@@ -458,21 +583,8 @@
                             <input id="system-c" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
-                            <label>SD</label>
-                            <input id="system-d" type="text" readonly>
-                        </div>
-                        
-                        <div class="label-value-pair">
-                            <label>SB</label>
-                            <input id="system-b" type="text" readonly>
-                        </div>
-                        <div class="label-value-pair">
-                            <label>SN</label>
-                            <input id="system-n" type="text" readonly>
-                        </div>
-                        <div class="label-value-pair">
-                            <label>SB/SN</label>
-                            <input id="system-bn-ratio" type="text" readonly>
+                            <label>SB/SE</label>
+                            <input id="system-be-ratio" type="text" readonly>
                         </div>
                         <div class="label-value-pair">
                             <label>ssc</label>
@@ -480,7 +592,7 @@
                         </div>
                     </div>
 
-                    <!-- Triangle Entropy row -->
+                    <!-- Triangle Entropy State row -->
                     <div class="panel-row">
                         <div class="label-value-pair">
                             <label>H</label>
@@ -522,7 +634,7 @@
                 </div>
             </div>
 
-            <!-- System Panel -->
+            <!-- System Information Panel -->
             <div class="dashboard-panel">
                     <h3 class="panel-header">System</h3>
                     <div class="panel-row">  <!-- Changed to panel-row for horizontal alignment -->
@@ -1039,162 +1151,170 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Legend Panel -->
-    <div class="dashboard-panel">
-        <h3 class="panel-header">LEGEND</h3>
-        <div class="panel-content">
-            <div class="row">
-                <div class="col-md-3">
-                    <p>∠: Angle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>θ: Intersection Angle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>∞: Undefined, null</p>
-                </div>
-                <div class="col-md-3">
-                    <p>(xy): position, coordinates</p>
-                </div>
-                <div class="col-md-3">
-                    <p>Af (xy): Coordinates of the Foot of the Altitude</p>
-                </div>
-                <div class="col-md-3">
-                    <p>Al: Length of the Altitude</p>
-                </div>
-                <div class="col-md-3">
-                    <p>a: acute angle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>B: Bits (Resource)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>C: Capacity (Area), measured in B (Bits)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>CIN: Capacity of the Incircle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>cst: Capacity of the Subtriangle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>d: distance between two points</p>
-                </div>
-                <div class="col-md-3">
-                    <p>EL: Euler Line length</p>
-                </div>
-                <div class="col-md-3">
-                    <p>H: Entropy (Length, Perimeter, Circumference), Total System Entropy (HP + HIC), measured in pixels</p>
-                </div>
-                <div class="col-md-3">
-                    <p>h: Subsystem Entropy</p>
-                </div>
-                <div class="col-md-3">
-                    <p>HIC: Intelligence Channel Entropy</p>
-                </div>
-                <div class="col-md-3">
-                    <p>HIN: Entropy (circumference) of the Incircle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>HO: Orthocenter</p>
-                </div>
-                <div class="col-md-3">
-                    <p>HP: System Perimeter Entropy</p>
-                </div>
-                <div class="col-md-3">
-                    <p>hst: Entropy of the Subtriangle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>I: Centroid, Intelligence of the system</p>
-                </div>
-                <div class="col-md-3">
-                    <p>IC: I-Channel or Intelligence Channel (distance from the centroid I to a Node N)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>IN: Incenter Point of the Incircle</p>
-                </div>
-                <div class="col-md-3"><div class="col-md-3">
-                    <p>l: Length</p>
-                </div>
-                    <p>M: Midpoint (between two Nodes)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>m: slope</p>
-                </div>
-                <div class="col-md-3">
-                    <p>ml: full Median length</p>
-                </div>
-                <div class="col-md-3">
-                    <p>N: Node (vertex)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>NC: Node Channel (distance between two Nodes)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>NP: Nine-Point Center</p>
-                </div>
-                <div class="col-md-3">
-                    <p>O: Circumcenter of the Circumcircle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>o: obtuse angle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>R: radius of a circle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>r: ratio</p>
-                </div>
-                <div class="col-md-3">
-                    <p>r(M,T): ratio of d(M,T) to the perimeter HP</p>
-                </div>
-                <div class="col-md-3">
-                    <p>rNC(M,T): ratio of d(M,T) to the NC length</p>
-                </div>
-                <div class="col-md-3">
-                    <p>stc: Subchannel of the Subtriangle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>SP: Subcenter Point of the Subcircle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>ss: Subsystem</p>
-                </div>
-                <div class="col-md-3">
-                    <p>ssb: Subsystem Bits (Resource)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>ssc: Subsystem Capacity (Area)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>ssh: Subsystem Entropy (Perimeter)</p>
-                </div>
-                <div class="col-md-3">
-                    <p>ssi: Subsystem Centroid, Subtriangle Node</p>
-                </div>
-                <div class="col-md-3">
-                    <p>st: Subtriangle</p>
-                </div>
-                <div class="col-md-3">
-                    <p>T: Tangent point of Incircle</p>
+        <!-- Data Management Section -->
+        <div class="data-controls-section d-flex flex-row justify-content-center gap-2 my-3">
+            <button id="exportImage" class="btn btn-primary btn-sm d-inline-block">Export Image</button>
+            <button id="exportData" class="btn btn-primary btn-sm d-inline-block">Export Data</button>
+            <button id="importButton" class="btn btn-primary btn-sm d-inline-block">Import Data</button>
+            <input type="file" id="importFile" style="display: none;" accept=".csv">
+        </div>
+
+        <!-- Legend Panel -->
+        <div class="dashboard-panel">
+            <h3 class="panel-header">LEGEND</h3>
+            <div class="panel-content">
+                <div class="row">
+                    <div class="col-md-3">
+                        <p>∠: Angle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>θ: Intersection Angle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>∞: Undefined, null</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>(xy): position, coordinates</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>Af (xy): Coordinates of the Foot of the Altitude</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>Al: Length of the Altitude</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>a: acute angle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>B: Bits (Resource)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>C: Capacity (Area), measured in B (Bits)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>CIN: Capacity of the Incircle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>cst: Capacity of the Subtriangle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>d: distance between two points</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>EL: Euler Line length</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>H: Entropy (Length, Perimeter, Circumference), Total System Entropy (HP + HIC), measured in pixels</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>h: Subsystem Entropy</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>HIC: Intelligence Channel Entropy</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>HIN: Entropy (circumference) of the Incircle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>HO: Orthocenter</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>HP: System Perimeter Entropy</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>hst: Entropy of the Subtriangle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>I: Centroid, Intelligence of the system</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>IC: I-Channel or Intelligence Channel (distance from the centroid I to a Node N)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>IN: Incenter Point of the Incircle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>l: Length</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>M: Midpoint (between two Nodes)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>m: slope</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>ml: full Median length</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>N: Node (vertex)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>NC: Node Channel (distance between two Nodes)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>NP: Nine-Point Center</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>O: Circumcenter of the Circumcircle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>o: obtuse angle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>R: radius of a circle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>r: ratio</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>r(M,T): ratio of d(M,T) to the perimeter HP</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>rNC(M,T): ratio of d(M,T) to the NC length</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>stc: Subchannel of the Subtriangle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>SP: Subcenter Point of the Subcircle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>ss: Subsystem</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>ssb: Subsystem Bits (Resource)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>ssc: Subsystem Capacity (Area)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>ssh: Subsystem Entropy (Perimeter)</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>ssi: Subsystem Centroid, Subtriangle Node</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>st: Subtriangle</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p>T: Tangent point of Incircle</p>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Load Google API scripts first -->
-<script async defer src="https://apis.google.com/js/api.js"></script>
-<script async defer src="https://accounts.google.com/gsi/client"></script>
+    <!-- Load Google API scripts first -->
+    <script async defer src="https://apis.google.com/js/api.js"></script>
+    <script async defer src="https://accounts.google.com/gsi/client"></script>
 
-<!-- Update application scripts to use modules with exact paths -->
-<script type="module" src="ss1-state/rules-module.js"></script>
-<script type="module" src="ss3-io/environment-module.js"></script>
-<script type="module" src="intelligence/intelligence-module.js"></script>
-<script type="module" src="shared/ui/controller.js"></script>
-<script type="module" src="index.js"></script>
-<script type="module" src="shared/ui/ui-manager.js"></script>
+    <!-- Update application scripts to use modules with exact paths -->
+    <script type="module" src="ss1-state/rules-module.js"></script>
+    <script type="module" src="ss3-io/environment-module.js"></script>
+    <script type="module" src="intelligence/intelligence-module.js"></script>
+    <script type="module" src="shared/ui/controller.js"></script>
+    <script type="module" src="index.js"></script>
+    <script type="module" src="shared/ui/ui-manager.js"></script>
 </body>
 </html>

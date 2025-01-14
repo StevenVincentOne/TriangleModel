@@ -24,24 +24,10 @@ export class CapacityModule {
             this.updateUtilizationPercentages(initialMetrics);
         }
 
-        // Add event listener for EB percent changes
-        const ebPercentInput = document.getElementById('eb-percent');
-        const enPercentInput = document.getElementById('en-percent');
-        
-        if (ebPercentInput && enPercentInput) {
-            ebPercentInput.addEventListener('input', () => {
-                const ebPercent = Math.min(Math.max(parseInt(ebPercentInput.value) || 0, 0), 100);
-                ebPercentInput.value = ebPercent;
-                enPercentInput.value = 100 - ebPercent;
-                this.updateBitsNoiseDistribution();
-            });
-
-            enPercentInput.addEventListener('input', () => {
-                const enPercent = Math.min(Math.max(parseInt(enPercentInput.value) || 0, 0), 100);
-                enPercentInput.value = enPercent;
-                ebPercentInput.value = 100 - enPercent;
-                this.updateBitsNoiseDistribution();
-            });
+        // Ensure randomize checkbox starts checked
+        const randomizeCheckbox = document.getElementById('randomize-data');
+        if (randomizeCheckbox) {
+            randomizeCheckbox.checked = true;
         }
     }
 
@@ -56,37 +42,111 @@ export class CapacityModule {
     }
 
     setupPercentageControls() {
-        // Handle EB percentage changes
-        document.getElementById('eb-percent')?.addEventListener('input', (e) => {
-            const ebPercent = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-            const enPercent = 100 - ebPercent;
-            
-            // Update EN percentage input
-            const enInput = document.getElementById('en-percent');
-            if (enInput) {
-                enInput.value = enPercent;
+        const ebPercentInput = document.getElementById('eb-percent');
+        const enPercentInput = document.getElementById('en-percent');
+        
+        if (ebPercentInput && enPercentInput) {
+            // Initialize stored percentages if not already set
+            if (!this.storedPercentages) {
+                this.storedPercentages = {
+                    eb: 50,
+                    en: 50
+                };
             }
             
-            // If we have current ED value, update EB/EN values
-            this.updateBitsNoiseDistribution();
-        });
+            // Ensure both inputs show initial values
+            ebPercentInput.value = this.storedPercentages.eb;
+            enPercentInput.value = this.storedPercentages.en;
+            
+            const validateAndUpdatePercentages = (primaryValue, primaryInput, complementaryInput, isPrimaryEB = true) => {
+                // Ensure value is between 0 and 100
+                let percent = parseInt(primaryValue) || 0;
+                percent = Math.min(Math.max(percent, 0), 100);
+                
+                const complementaryPercent = 100 - percent;
+                
+                // Update stored values first
+                if (isPrimaryEB) {
+                    this.storedPercentages.eb = percent;
+                    this.storedPercentages.en = complementaryPercent;
+                } else {
+                    this.storedPercentages.en = percent;
+                    this.storedPercentages.eb = complementaryPercent;
+                }
+                
+                // Update input values
+                primaryInput.value = percent;
+                complementaryInput.value = complementaryPercent;
+                
+                // Update dashboard data
+                if (this.currentDashboardData) {
+                    this.currentDashboardData.ebPercent = this.storedPercentages.eb;
+                    this.currentDashboardData.enPercent = this.storedPercentages.en;
+                }
+                
+                this.updateBitsNoiseDistribution();
+            };
+
+            // Handle real-time input validation and updates
+            ebPercentInput.addEventListener('input', (e) => {
+                validateAndUpdatePercentages(e.target.value, ebPercentInput, enPercentInput, true);
+            });
+
+            enPercentInput.addEventListener('input', (e) => {
+                validateAndUpdatePercentages(e.target.value, enPercentInput, ebPercentInput, false);
+            });
+
+            // Also handle blur events to ensure valid values
+            ebPercentInput.addEventListener('blur', (e) => {
+                validateAndUpdatePercentages(e.target.value, ebPercentInput, enPercentInput, true);
+            });
+
+            enPercentInput.addEventListener('blur', (e) => {
+                validateAndUpdatePercentages(e.target.value, enPercentInput, ebPercentInput, false);
+            });
+        }
     }
 
-    updateBitsNoiseDistribution() {
+    updateBitsNoiseDistribution(forced = false) {
         const edInput = document.getElementById('system-ed');
         const ebInput = document.getElementById('system-eb');
         const enInput = document.getElementById('system-en');
         const ebPercentInput = document.getElementById('eb-percent');
+        const enPercentInput = document.getElementById('en-percent');
         
-        if (edInput && ebInput && enInput && ebPercentInput) {
+        if (edInput && ebInput && enInput && ebPercentInput && enPercentInput) {
             const edValue = parseFloat(edInput.value) || 0;
-            const ebPercent = parseInt(ebPercentInput.value) || 0;
             
+            // Always use stored percentages for consistency
+            const ebPercent = this.storedPercentages.eb;
+            const enPercent = this.storedPercentages.en;
+            
+            console.log('Distribution calculation:', {
+                edValue,
+                ebPercent,
+                enPercent,
+                forced,
+                storedPercentages: this.storedPercentages
+            });
+            
+            // Calculate values
             const ebValue = Math.round(edValue * (ebPercent / 100));
-            const enValue = Math.round(edValue * ((100 - ebPercent) / 100));
+            const enValue = edValue - ebValue; // Ensure total equals edValue
             
+            // Update displays
             ebInput.value = ebValue;
             enInput.value = enValue;
+            
+            // Always update percentage displays to match stored values
+            ebPercentInput.value = ebPercent;
+            enPercentInput.value = enPercent;
+
+            if (this.currentDashboardData) {
+                this.currentDashboardData.bitsCount = ebValue;
+                this.currentDashboardData.noiseCount = enValue;
+                this.currentDashboardData.ebPercent = ebPercent;
+                this.currentDashboardData.enPercent = enPercent;
+            }
         }
     }
 
@@ -98,7 +158,16 @@ export class CapacityModule {
         }
 
         const result = [];
-        const randomize = document.getElementById('randomize-data')?.checked ?? true;
+        // Fix the default value to true and properly get checkbox state
+        const randomizeCheckbox = document.getElementById('randomize-data');
+        const randomize = randomizeCheckbox ? randomizeCheckbox.checked : true;
+
+        console.log('Generating symbols:', {
+            type,
+            count,
+            randomize,
+            availableSymbols: symbols
+        });
 
         if (randomize) {
             // Random distribution
@@ -107,22 +176,20 @@ export class CapacityModule {
                 result.push(symbols[randomIndex]);
             }
         } else {
-            // Uniform distribution
-            const symbolCount = Math.floor(count / symbols.length);
-            const remainder = count % symbols.length;
-            
-            // Add equal amounts of each symbol
-            symbols.forEach(symbol => {
-                for (let i = 0; i < symbolCount; i++) {
-                    result.push(symbol);
-                }
-            });
-            
-            // Add remaining symbols to reach exact count
-            for (let i = 0; i < remainder; i++) {
-                result.push(symbols[i]);
+            // Uniform/alphabetical distribution
+            let currentIndex = 0;
+            for (let i = 0; i < count; i++) {
+                result.push(symbols[currentIndex]);
+                currentIndex = (currentIndex + 1) % symbols.length; // Wrap around to start
             }
         }
+
+        console.log('Generated symbols:', {
+            requestedCount: count,
+            actualCount: result.length,
+            sample: result.slice(0, 10),
+            distribution: randomize ? 'random' : 'uniform'
+        });
 
         return result;
     }
@@ -131,7 +198,6 @@ export class CapacityModule {
         try {
             console.log('Starting system data initialization');
             
-            // Wait for database to be ready
             await this.environmentDB.ready;
             console.log('Database ready for initialization');
 
@@ -140,25 +206,30 @@ export class CapacityModule {
                 throw new Error('No metrics available');
             }
 
-            // Get ED percentage from input
+            // Get and preserve current percentages
             const edPercentInput = document.getElementById('ed-percent');
-            const edPercent = edPercentInput ? (parseInt(edPercentInput.value) || 50) : 50;
-            
-            // Calculate total capacity and used capacity based on ED%
-            const totalCapacity = metrics.totalExternal;
-            const usedCapacity = totalCapacity * (edPercent / 100);
-
-            // Get EB/EN distribution percentages
             const ebPercentInput = document.getElementById('eb-percent');
-            const ebPercent = ebPercentInput ? (parseInt(ebPercentInput.value) || 50) : 50;
+            const enPercentInput = document.getElementById('en-percent');
             
-            // Calculate counts for bits and noise
+            // Get current percentages, preserving existing values
+            const edPercent = edPercentInput ? parseInt(edPercentInput.value) : 50;
+            const ebPercent = ebPercentInput ? parseInt(ebPercentInput.value) : 50;
+            const enPercent = enPercentInput ? parseInt(enPercentInput.value) : 50;
+            
+            console.log('Using percentages:', { edPercent, ebPercent, enPercent });
+            
+            // Calculate capacities
+            const totalCapacity = metrics.totalExternal;
+            const usedCapacity = Math.floor(totalCapacity * (edPercent / 100));
+
+            // Calculate counts using preserved percentages
             const bitsCount = Math.floor(usedCapacity * (ebPercent / 100));
-            const noiseCount = Math.floor(usedCapacity * ((100 - ebPercent) / 100));
+            const noiseCount = usedCapacity - bitsCount; // Ensure total equals usedCapacity
 
             const dashboardData = {
                 edPercent,
                 ebPercent,
+                enPercent,
                 totalCapacity,
                 usedCapacity,
                 bitsCount,
@@ -168,20 +239,17 @@ export class CapacityModule {
                 cc3: metrics.cc3
             };
 
-            // Store dashboard data in instance variable
+            // Store dashboard data
             this.currentDashboardData = dashboardData;
-
-            // Update UI with calculated values
-            this.updateDashboard(dashboardData);
+            
+            // Update UI without overwriting percentages
+            this.updateDashboard(dashboardData, true);
 
             console.log('Generating symbol pools with counts:', { bitsCount, noiseCount });
 
-            // Generate actual symbol arrays
-            const bitsPool = Array.from({ length: bitsCount }, () => 
-                this.symbolPool.bits[Math.floor(Math.random() * this.symbolPool.bits.length)]);
-            
-            const noisePool = Array.from({ length: noiseCount }, () => 
-                this.symbolPool.noise[Math.floor(Math.random() * this.symbolPool.noise.length)]);
+            // Use generateSymbols method instead of direct random generation
+            const bitsPool = this.generateSymbols('bits', bitsCount);
+            const noisePool = this.generateSymbols('noise', noiseCount);
 
             const poolData = {
                 bits: bitsPool,
@@ -192,7 +260,8 @@ export class CapacityModule {
                 bitsLength: bitsPool.length,
                 noiseLength: noisePool.length,
                 sampleBits: bitsPool.slice(0, 10),
-                sampleNoise: noisePool.slice(0, 10)
+                sampleNoise: noisePool.slice(0, 10),
+                randomized: document.getElementById('randomize-data')?.checked
             });
 
             // Store in database
@@ -212,130 +281,38 @@ export class CapacityModule {
         }
     }
 
-    updateDashboard(data) {
-        // Store the data for future reference
-        this.currentDashboardData = data;
-        
-        console.log('CapacityModule updating dashboard with data:', data);
+    updateDashboard(data, preservePercentages = false) {
+        if (!data) return;
 
-        // Update CC area values with simple decimal formatting and wider width
-        const ccElement = document.getElementById('circumcircle-area');
-        if (ccElement) {
-            ccElement.value = data.totalCapacity.toFixed(2);
-            ccElement.style.textAlign = 'center';
-            ccElement.style.width = '14ch';
-            ccElement.style.minWidth = '14ch';
-        }
-
-        const cc1Element = document.getElementById('cc1-area');
-        if (cc1Element) {
-            cc1Element.value = data.cc1.toFixed(2);
-            cc1Element.style.textAlign = 'center';
-            cc1Element.style.width = '14ch';
-            cc1Element.style.minWidth = '14ch';
-        }
-
-        const cc2Element = document.getElementById('cc2-area');
-        if (cc2Element) {
-            cc2Element.value = data.cc2.toFixed(2);
-            cc2Element.style.textAlign = 'center';
-            cc2Element.style.width = '14ch';
-            cc2Element.style.minWidth = '14ch';
-        }
-
-        const cc3Element = document.getElementById('cc3-area');
-        if (cc3Element) {
-            cc3Element.value = data.cc3.toFixed(2);
-            cc3Element.style.textAlign = 'center';
-            cc3Element.style.width = '14ch';
-            cc3Element.style.minWidth = '14ch';
-        }
-
-        // Calculate utilization percentages
-        const ccuPercent = (data.usedCapacity / data.totalCapacity) * 100;
-        const usedPerCC = data.usedCapacity / 3;
-        const ccu1Percent = (usedPerCC / data.cc1) * 100;
-        const ccu2Percent = (usedPerCC / data.cc2) * 100;
-        const ccu3Percent = (usedPerCC / data.cc3) * 100;
-
-        console.log('Calculated utilization percentages:', {
-            ccuPercent,
-            ccu1Percent,
-            ccu2Percent,
-            ccu3Percent,
-            usedPerCC
-        });
-
-        // Update CCU values with percentages (using toFixed(2) instead of Math.round)
-        const ccuElement = document.getElementById('circumcircle-utilization');
-        if (ccuElement) {
-            ccuElement.value = ccuPercent.toFixed(2);  // Remove % symbol for now
-        }
-
-        // Update CCU1, CCU2, CCU3 with percentages
-        const ccu1Element = document.getElementById('cc1-utilization');
-        if (ccu1Element) {
-            ccu1Element.value = ccu1Percent.toFixed(2);  // Remove % symbol for now
-        }
-
-        const ccu2Element = document.getElementById('cc2-utilization');
-        if (ccu2Element) {
-            ccu2Element.value = ccu2Percent.toFixed(2);  // Remove % symbol for now
-        }
-
-        const ccu3Element = document.getElementById('cc3-utilization');
-        if (ccu3Element) {
-            ccu3Element.value = ccu3Percent.toFixed(2);  // Remove % symbol for now
-        }
-
-        // Update ED%
-        const edPercentElement = document.getElementById('ed-percent');
-        if (edPercentElement) {
-            edPercentElement.value = data.edPercent;
-            console.log(`ED% (Environmental Data %): ${data.edPercent}%`);
-        }
-
-        // Update ED value and trigger utilization update
+        // Update ED value
         const edElement = document.getElementById('system-ed');
         if (edElement) {
-            const previousValue = edElement.value;
-            const newValue = Math.round(data.usedCapacity);
-            edElement.value = newValue;
-            console.log(`ED (System Environmental Data): ${newValue}`);
-            
-            // If ED value changed, update utilizations
-            if (previousValue !== newValue.toString()) {
-                this.updateUtilizationPercentages({
-                    totalExternal: data.totalCapacity,
-                    cc1: data.cc1,
-                    cc2: data.cc2,
-                    cc3: data.cc3
-                });
-            }
-        }
-
-        // Update EB%
-        const ebPercentElement = document.getElementById('eb-percent');
-        if (ebPercentElement) {
-            ebPercentElement.value = data.ebPercent;
-            console.log(`EB% (Environmental Bits %): ${data.ebPercent}%`);
+            edElement.value = Math.round(data.usedCapacity || 0);
         }
 
         // Update EB value
         const ebElement = document.getElementById('system-eb');
         if (ebElement) {
-            ebElement.value = data.bitsCount;
-            console.log(`EB (System Environmental Bits): ${data.bitsCount}`);
+            ebElement.value = Math.round(data.bitsCount || 0);
         }
 
         // Update EN value
         const enElement = document.getElementById('system-en');
         if (enElement) {
-            enElement.value = data.noiseCount;
-            console.log(`EN (System Environmental Noise): ${data.noiseCount}`);
+            enElement.value = Math.round(data.noiseCount || 0);
         }
 
-        console.log('CapacityModule dashboard update complete');
+        // Update percentages only if not preserving current values
+        if (!preservePercentages) {
+            const ebPercentElement = document.getElementById('eb-percent');
+            const enPercentElement = document.getElementById('en-percent');
+            
+            if (ebPercentElement && enPercentElement) {
+                // Use stored percentages instead of data values
+                ebPercentElement.value = this.storedPercentages?.eb || data.ebPercent || 0;
+                enPercentElement.value = this.storedPercentages?.en || data.enPercent || 0;
+            }
+        }
     }
 
     // Add method to get current dashboard data
@@ -343,33 +320,12 @@ export class CapacityModule {
         return this.currentDashboardData;
     }
 
-    // Add method to prevent dashboard reset
-    setupDashboardListeners() {
-        const edPercentElement = document.getElementById('ed-percent');
-        const ebPercentElement = document.getElementById('eb-percent');
-
-        if (edPercentElement) {
-            edPercentElement.addEventListener('change', (e) => {
-                if (this.currentDashboardData) {
-                    this.currentDashboardData.edPercent = parseInt(e.target.value) || 0;
-                }
-            });
-        }
-
-        if (ebPercentElement) {
-            ebPercentElement.addEventListener('change', (e) => {
-                if (this.currentDashboardData) {
-                    this.currentDashboardData.ebPercent = parseInt(e.target.value) || 0;
-                }
-            });
-        }
-    }
 
     updateUtilizationPercentages(metrics) {
-        console.log('CapacityModule: Received metrics update:', metrics);
+        
         
         if (!metrics) {
-            console.warn('CapacityModule: No metrics provided to updateUtilizationPercentages');
+            
             return;
         }
 
@@ -377,7 +333,7 @@ export class CapacityModule {
         const edElement = document.getElementById('system-ed');
         const currentED = edElement ? parseFloat(edElement.value) : 0;
         
-        console.log('CapacityModule: Current ED:', currentED);
+        
 
         if (metrics.totalExternal === 0) {
             console.warn('CapacityModule: totalExternal is 0, cannot calculate utilization.');
@@ -392,24 +348,18 @@ export class CapacityModule {
         const ccu2Percent = (usedPerCC / metrics.cc2) * 100;
         const ccu3Percent = (usedPerCC / metrics.cc3) * 100;
 
-        console.log('CapacityModule: Calculated utilization percentages:', {
-            ccuPercent,
-            ccu1Percent,
-            ccu2Percent,
-            ccu3Percent,
-            usedPerCC
-        });
+        
 
         // Update CCU displays with null checks and 2 decimal places
         const updateUtilization = (elementId, value) => {
             const element = document.getElementById(elementId);
             if (element) {
                 const formattedValue = value.toFixed(2); // Ensure two decimal places
-                console.log(`CapacityModule: Setting ${elementId} to ${formattedValue}%`);
+                
                 element.value = `${formattedValue}%`;
-                console.log(`CapacityModule: ${elementId} now has value "${element.value}"`);
+                
             } else {
-                console.warn(`CapacityModule: Element with ID ${elementId} not found.`);
+                
             }
         };
 
@@ -418,6 +368,6 @@ export class CapacityModule {
         updateUtilization('cc2-utilization', ccu2Percent);
         updateUtilization('cc3-utilization', ccu3Percent);
 
-        console.log('CapacityModule: Dashboard update complete');
+        
     }
 } 

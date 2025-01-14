@@ -38,7 +38,7 @@ export class IntelligenceModule {
 
         // Initialize clean system state
         this.generateInitialDataset();
-        this.updateDashboard();
+        
 
         
     }
@@ -210,30 +210,7 @@ export class IntelligenceModule {
         document.dispatchEvent(event);
     }
 
-    // Update Dashboard UI
-    updateDashboard() {
-        const systemD = document.getElementById('system-d');
-        const systemNetD = document.getElementById('system-net-d');
-        const systemConverted = document.getElementById('system-converted');
-        const systemB = document.getElementById('system-b');
-        const systemN = document.getElementById('system-n');
-        const systemBNRatio = document.getElementById('system-bn-ratio');
-
-        if (systemD) systemD.value = this.entropyState.totalLetters;
-        if (systemNetD) systemNetD.value = this.entropyState.netLetters;
-        if (systemConverted) systemConverted.value = this.entropyState.convertedData;
-        if (systemB) systemB.value = this.entropyState.totalWords;
-        if (systemN) systemN.value = this.entropyState.totalEntropy;
-        
-        if (systemBNRatio) {
-            if (this.entropyState.totalEntropy === 0) {
-                systemBNRatio.value = 'N/A';
-            } else {
-                const ratio = this.entropyState.totalWords / this.entropyState.totalEntropy;
-                systemBNRatio.value = ratio.toFixed(2);
-            }
-        }
-    }
+    
 
     // Initialize or Reset System State
     generateInitialDataset() {

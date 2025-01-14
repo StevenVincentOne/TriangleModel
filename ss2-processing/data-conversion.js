@@ -12,24 +12,22 @@ export class DataConversion {
         this.lastProcessTime = Date.now();
         this.lastFilterTime = Date.now();  // Add separate timing for filtering
         
-        // Initialize flow rate ratios
-        this.currentPbRatio = 50; // Default PB ratio
-        this.currentPnRatio = 50; // Default PN ratio
+        
         
         // Add noise mapping
         this.noiseMap = {
-            'A': 'α', 'B': 'β', 'C': 'γ', 'D': 'δ', 'E': 'ε',
-            'F': 'ζ', 'G': 'η', 'H': 'θ', 'I': 'ι', 'J': 'κ',
-            'K': 'λ', 'L': 'μ', 'M': 'ν', 'N': 'ξ', 'O': 'ο',
-            'P': 'π', 'Q': 'ρ', 'R': 'σ', 'S': 'τ', 'T': 'υ',
-            'U': 'φ', 'V': 'χ', 'W': 'ψ', 'X': 'ω', 'Y': 'ϑ',
-            'Z': 'ϕ'
+            'A': 'α', 'B': 'β', 'C': 'ς', 'D': 'δ', 'E': 'ε',
+            'F': 'φ', 'G': 'γ', 'H': 'η', 'I': 'ι', 'J': 'ξ',
+            'K': 'κ', 'L': 'λ', 'M': 'μ', 'N': 'ν', 'O': 'ο',
+            'P': 'π', 'Q': 'ϱ', 'R': 'ρ', 'S': 'σ', 'T': 'τ',
+            'U': 'υ', 'V': 'ϑ', 'W': 'ω', 'X': 'χ', 'Y': 'ψ',
+            'Z': 'ζ', '∅': 'θ'
         };
         
         // Initialize all elements and controls
         this.initializeDashboardElements();
         this.initializeControls();
-        this.startProcessingMonitoring();
+        
         
         // Listen for zero events
         document.getElementById('zeroDataButton').addEventListener('click', async () => {
@@ -71,17 +69,10 @@ export class DataConversion {
 
     initializeDashboardElements() {
         this.dashboardElements = {
-            procpoolData: document.getElementById('procpool-d'),
-            procpoolBytes: document.getElementById('procpool-b'),
-            procpoolNoise: document.getElementById('procpool-n'),
-            flowRate: document.getElementById('conversion-rate'),
-            procbflowrate: document.getElementById('proc-b-flow-rate'),
-            procnflowrate: document.getElementById('proc-n-flow-rate')
+            
         };
 
-        // Initialize flow rate ratios based on default or existing input values
-        this.currentPbRatio = parseInt(this.dashboardElements.procbflowrate?.value) || 50;
-        this.currentPnRatio = parseInt(this.dashboardElements.procnflowrate?.value) || 50;
+        
 
         // Set up flow rate input handler
         if (this.dashboardElements.flowRate) {
@@ -104,36 +95,7 @@ export class DataConversion {
             });
         }
 
-        // Set up linked PB/PN flow rate handlers
-        if (this.dashboardElements.procbflowrate) {
-            this.dashboardElements.procbflowrate.addEventListener('input', (e) => {
-                const pbValue = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                const pnValue = 100 - pbValue;
-                
-                // Update inputs
-                this.dashboardElements.procbflowrate.value = pbValue;
-                if (this.dashboardElements.procnflowrate) {
-                    this.dashboardElements.procnflowrate.value = pnValue;
-                }
-                
-                console.log('Updated processing flow rates:', { pb: pbValue, pn: pnValue });
-            });
-        }
-
-        if (this.dashboardElements.procnflowrate) {
-            this.dashboardElements.procnflowrate.addEventListener('input', (e) => {
-                const pnValue = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                const pbValue = 100 - pnValue;
-                
-                // Update inputs
-                this.dashboardElements.procnflowrate.value = pnValue;
-                if (this.dashboardElements.procbflowrate) {
-                    this.dashboardElements.procbflowrate.value = pbValue;
-                }
-                
-                console.log('Updated processing flow rates:', { pb: pbValue, pn: pnValue });
-            });
-        }
+        
     }
 
     initializeControls() {
@@ -161,16 +123,7 @@ export class DataConversion {
             });
         }
 
-        const filterNoiseButton = document.getElementById('filterNoiseButton');
-        if (filterNoiseButton) {
-            filterNoiseButton.addEventListener('click', () => {
-                if (this.isFiltering) {
-                    this.stopNoiseFiltering();
-                } else {
-                    this.startNoiseFiltering();
-                }
-            });
-        }
+        
     }
 
     async startProcessingMonitoring() {
@@ -184,37 +137,7 @@ export class DataConversion {
         }, 100);
     }
 
-    async updateProcessingDisplay() {
-        try {
-            const poolCounts = await this.environmentDB.getProcessingPoolCounts();
-            
-            // Update displays with whole numbers
-            if (this.dashboardElements.procpoolData) {
-                this.dashboardElements.procpoolData.value = Math.round(poolCounts.totalBits + poolCounts.noise);
-            }
-            if (this.dashboardElements.procpoolBytes) {
-                this.dashboardElements.procpoolBytes.value = Math.round(poolCounts.totalBits);
-            }
-            if (this.dashboardElements.procpoolNoise) {
-                this.dashboardElements.procpoolNoise.value = Math.round(poolCounts.noise);
-            }
-
-            // Batch logging
-            this.symbolCount++;
-            if (this.symbolCount >= this.batchSize) {
-                console.log('Processing Pool batch report:', {
-                    batchSize: this.batchSize,
-                    totalData: poolCounts.totalBits + poolCounts.noise,
-                    bits: poolCounts.totalBits,
-                    noise: poolCounts.noise,
-                    bitsBySymbol: poolCounts.bits
-                });
-                this.symbolCount = 0;
-            }
-        } catch (error) {
-            console.error('Error updating processing display:', error);
-        }
-    }
+    
 
     stopProcessingMonitoring() {
         if (this.monitoringInterval) {
@@ -232,80 +155,7 @@ export class DataConversion {
         this.isConverting = false;
     }
 
-    async startConversion() {
-        console.log('Starting conversion process');
-        this.isConverting = true;
-        
-        const symbolsPerSecond = this.flowRate || 10;
-        const intervalMs = 1000 / symbolsPerSecond;
-        
-        this.conversionInterval = setInterval(async () => {
-            try {
-                const uptakeData = await this.environmentDB.getUptakeSymbols();
-                
-                if (!uptakeData || uptakeData.length === 0) {
-                    return; // No data to process
-                }
-
-                const symbol = uptakeData[0];
-                const pbLossRateInput = document.getElementById('pb-loss-rate');
-                const pbLossRate = parseInt(pbLossRateInput?.value) || 0;
-                
-                // Debug logging
-                console.log('Processing symbol with PB Loss:', {
-                    symbol: symbol.symbol,
-                    type: symbol.type,
-                    pbLossRate: pbLossRate,
-                    inputValue: pbLossRateInput?.value
-                });
-                
-                // Determine if bit should be converted to noise
-                let finalType = symbol.type;
-                let finalSymbol = symbol.symbol;
-                
-                if (symbol.type === 'bit') {
-                    const randomValue = Math.random() * 100;
-                    if (randomValue < pbLossRate) {
-                        finalType = 'noise';
-                        finalSymbol = this.convertBitToNoise(symbol.symbol);
-                        console.log(`Bit conversion triggered:`, {
-                            original: symbol.symbol,
-                            converted: finalSymbol,
-                            randomValue: randomValue,
-                            lossRate: pbLossRate
-                        });
-                    }
-                }
-
-                // Store in processing pool
-                await this.environmentDB.storeProcessingPoolSymbol({
-                    symbol: finalSymbol,
-                    type: finalType,
-                    timestamp: Date.now()
-                });
-
-                // Remove from uptake store
-                await this.environmentDB.deleteUptakeSymbol(symbol.id);
-
-                // Trigger display updates
-                window.dispatchEvent(new CustomEvent('storeChanged', { 
-                    detail: { 
-                        store: 'processingPool',
-                        action: 'convert',
-                        conversion: finalType === 'noise' && symbol.type === 'bit' 
-                            ? `${symbol.symbol} → ${finalSymbol}` 
-                            : null
-                    }
-                }));
-
-            } catch (error) {
-                console.error('Error in conversion interval:', error);
-                this.stopConversion();
-            }
-        }, intervalMs);
-    }
-
-    startByteConversion() {
+    async startByteConversion() {
         if (this.byteConversionInterval) {
             console.log('Conversion already running, stopping first');
             this.stopByteConversion();
@@ -353,15 +203,14 @@ export class DataConversion {
                 }
 
                 this.lastProcessTime = now;
-                const poolCounts = await this.environmentDB.getProcessingPoolCounts();
                 const poolSymbols = await this.environmentDB.getProcessingPool();
+                const bitSymbols = poolSymbols.filter(symbol => symbol.type === 'bit');
                 
                 let processedBitsThisCycle = 0;
                 let processedNoiseThisCycle = 0;
                 let batchReport = { bytes: [], entropy: [], filtered: [] };
 
                 // Process bits to bytes
-                const bitSymbols = poolSymbols.filter(symbol => symbol.type === 'bit');
                 for (const symbol of bitSymbols) {
                     if (processedBitsThisCycle >= maxBitsToProcess) break;
 
@@ -598,63 +447,43 @@ export class DataConversion {
 
     async updateDisplay(poolCounts) {
         try {
-            // Update Processing Pool displays
-            if (poolCounts) {
-                const processingPoolDisplays = {
-                    'procpool-d': Math.round(poolCounts.totalBits + poolCounts.noise).toString(),
-                    'procpool-b': Math.round(poolCounts.totalBits * (this.currentPbRatio / 100)).toString(),
-                    'procpool-n': Math.round(poolCounts.noise * (this.currentPnRatio / 100)).toString()
-                };
-
-                Object.entries(processingPoolDisplays).forEach(([id, value]) => {
-                    const element = document.getElementById(id);
-                    if (element) {
-                        element.value = value;
-                    }
-                });
-            }
-
-            // Update Converted Bytes and Entropy displays separately
-            const convertedData = await this.environmentDB.getConvertedBytes();
-            const bytesCount = convertedData
-                .filter(b => b.type === 'byte')
-                .reduce((sum, b) => sum + (b.count || 1), 0);
-            const entropyCount = convertedData
-                .filter(b => b.type === 'entropy')
-                .reduce((sum, b) => sum + (b.count || 1), 0);
+            // Get existing converted bytes and entropy counts
+            const convertedBytesCount = await this.environmentDB.getConvertedBytes()
+                .then(bytes => bytes.filter(b => b.type === 'byte')
+                    .reduce((sum, b) => sum + (b.count || 1), 0));
             
-            // Update CB display (bytes only)
-            const cbDisplay = document.getElementById('convertedBytes');
-            if (cbDisplay) {
-                cbDisplay.value = bytesCount.toString();
+            const convertedEntropyCount = await this.environmentDB.getConvertedBytes()
+                .then(bytes => bytes.filter(b => b.type === 'entropy')
+                    .reduce((sum, b) => sum + (b.count || 1), 0));
+
+            // Get filtered noise count
+            const filteredNoiseCount = await this.environmentDB.getFilteredNoiseCount();
+
+            // Update display elements - Fix the ID to match HTML
+            const convertedBytesInput = document.getElementById('convertedBytes');
+            if (convertedBytesInput) {
+                convertedBytesInput.value = convertedBytesCount;
             }
 
-            // Update CE display (entropy only)
-            const ceDisplay = document.getElementById('convertedEntropy');
-            if (ceDisplay) {
-                ceDisplay.value = entropyCount.toString();
+            const convertedEntropyInput = document.getElementById('convertedEntropy');
+            if (convertedEntropyInput) {
+                convertedEntropyInput.value = convertedEntropyCount;
             }
 
-            // Update CN display (filtered noise)
-            const filteredNoise = await this.environmentDB.getFilteredNoise();
-            const noiseCount = filteredNoise
-                .filter(n => n.type === 'noise')
-                .reduce((sum, n) => sum + (n.count || 1), 0);
-            
-            const cnDisplay = document.getElementById('convert-step-n');
-            if (cnDisplay) {
-                cnDisplay.value = noiseCount.toString();
+            // Update CN input
+            const cnInput = document.getElementById('convert-step-n');
+            if (cnInput) {
+                cnInput.value = filteredNoiseCount;
             }
 
-            // Log current state
+            // Log the display state
             console.log('Display State:', {
-                convertedBytes: bytesCount,
-                convertedEntropy: entropyCount,
-                filteredNoise: noiseCount
+                convertedBytes: convertedBytesCount,
+                convertedEntropy: convertedEntropyCount,
+                filteredNoise: filteredNoiseCount
             });
-
         } catch (error) {
-            console.error('Error updating displays:', error);
+            console.error('Error updating conversion displays:', error);
         }
     }
 
