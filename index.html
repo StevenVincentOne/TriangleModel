@@ -296,14 +296,34 @@
                     <canvas id="canvas"></canvas>
                 </div>
 
-                <!-- Right Environment Panel -->
+                <!-- Right State Panel -->
                 <div class="animation-panel right-panel bg-dark p-2 rounded">
+                    <!-- Zero State Controls -->
+                    <div class="zero-controls">
+                        <button id="zeroStateButton" class="btn btn-sm compact-btn" style="background-color: #1a472a; color: white; padding: 2px 8px; margin-right: 4px;">Zero</button>
+                        <div class="store-checkboxes">
+                            <div class="store-checkbox">
+                                <input type="checkbox" id="zero-intake" checked>
+                                <label for="zero-intake" class="small-text">I</label>
+                            </div>
+                            <div class="store-checkbox">
+                                <input type="checkbox" id="zero-nc" checked>
+                                <label for="zero-nc" class="small-text">NC</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <style>
+                        #zeroStateButton:hover {
+                            background-color: #2a603c !important;
+                        }
+                    </style>
+
                     <!-- State Controls Buttons -->
                     <div class="intelligence-controls compact-controls" style="display: flex; justify-content: flex-start;">
                         <div class="button-row">
                             <button id="intakeStateButton" class="btn btn-sm compact-btn">Intake</button>
                             <button id="stateUpdateButton" class="btn btn-sm compact-btn">Update</button>
-                            
                         </div>
                     </div>
                     
@@ -411,7 +431,7 @@
                         <!-- Run Controls -->
                         <div class="nc-controls" style="margin-left: 0;">
                             <div class="input-row">
-                                <button id="stateRunButton" class="btn btn-sm compact-btn">Run</button>
+                                <button id="stateRunButton" class="btn btn-sm btn-primary compact-btn" style="width: 14ch; text-align: center; margin-bottom: 0.5rem; padding: 0.375rem 0.75rem; border-radius: 4px; background-color: #198754; border-color: #198754; color: #fff;">Run</button>
                                 <label for="run-rate">R</label>
                                 <input type="number" id="run-rate" min="0" max="1000" value="10" step="1">
                             </div>

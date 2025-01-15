@@ -24,6 +24,7 @@ export class EnvironmentDatabase {
         this.version = 7;  // Incremented version
         this.ready = this.initializeDatabase();
         this.initializeZeroButton();
+        this.initializeZeroStateButton();
 
         EnvironmentDatabase.instance = this;
     }
@@ -265,26 +266,28 @@ export class EnvironmentDatabase {
         }
     }
 
-    async storeConvertedBytes(data) {
-        console.log('Storing in convertedBytes:', data); // Logging
+    async storeConvertedBytes(symbolData) {
         try {
             await this.ready;
             const transaction = this.#db.transaction('convertedBytes', 'readwrite');
             const store = transaction.objectStore('convertedBytes');
             
+            // Verify the data structure
+            console.log('Storing converted bytes:', {
+                symbol: symbolData.symbol,
+                type: symbolData.type, // Should be 'byte' or 'entropy'
+                count: symbolData.count,
+                timestamp: symbolData.timestamp
+            });
+
             return new Promise((resolve, reject) => {
-                const request = store.add({
-                    ...data,
-                    timestamp: Date.now()
-                });
-                
+                const request = store.add(symbolData);
                 request.onsuccess = () => {
-                    window.dispatchEvent(new CustomEvent('convertedBytesUpdated', { 
-                        detail: { action: 'add', data }
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { store: 'convertedBytes', action: 'add', data: symbolData }
                     }));
                     resolve(request.result);
                 };
-                
                 request.onerror = () => reject(request.error);
             });
         } catch (error) {
@@ -1057,11 +1060,22 @@ export class EnvironmentDatabase {
     }
 
     async clearAllStores() {
-        const stores = ['environment', 'processing', 'uptake', 'processingPool', 'convertedBytes', 'filteredNoise', 'stateIntake'];
+        const stores = ['environment', 'processing', 'uptake', 'processingPool', 'convertedBytes', 'filteredNoise', 'stateIntake', 'stateUpdateNC1', 'stateUpdateNC2', 'stateUpdateNC3'];
         for (const storeName of stores) {
             try {
                 await this.clearStore(storeName);
                 console.log(`Cleared store: ${storeName}`);
+                
+                // Dispatch update events for NC stores
+                if (storeName.startsWith('stateUpdateNC')) {
+                    const ncNumber = parseInt(storeName.slice(-1));
+                    window.dispatchEvent(new CustomEvent('stateUpdateNCUpdated', {
+                        detail: {
+                            nc: ncNumber,
+                            action: 'clear'
+                        }
+                    }));
+                }
             } catch (error) {
                 console.error(`Error clearing store ${storeName}:`, error);
             }
@@ -1154,6 +1168,87 @@ export class EnvironmentDatabase {
         } catch (error) {
             console.error('Database: Error in getFilteredNoiseCount:', error);
             throw error;
+        }
+    }
+
+    async storeStateIntake(symbolData) {
+        try {
+            await this.ready;
+            const transaction = this.#db.transaction('stateIntake', 'readwrite');
+            const store = transaction.objectStore('stateIntake');
+            
+            // Verify the data structure
+            console.log('Storing state intake:', {
+                symbol: symbolData.symbol,
+                type: symbolData.type, // Should be 'byte' or 'entropy'
+                count: symbolData.count,
+                timestamp: symbolData.timestamp
+            });
+
+            return new Promise((resolve, reject) => {
+                const request = store.add(symbolData);
+                request.onsuccess = () => {
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { store: 'stateIntake', action: 'add', data: symbolData }
+                    }));
+                    resolve(request.result);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error('Error storing state intake:', error);
+            throw error;
+        }
+    }
+
+    initializeZeroStateButton() {
+        const zeroStateButton = document.getElementById('zeroStateButton');
+        if (zeroStateButton) {
+            zeroStateButton.addEventListener('click', async () => {
+                try {
+                    // Get checkbox states
+                    const intakeChecked = document.getElementById('zero-intake')?.checked || false;
+                    const ncChecked = document.getElementById('zero-nc')?.checked || false;
+
+                    console.log('Zeroing selected state stores:', {
+                        intake: intakeChecked,
+                        nc: ncChecked
+                    });
+
+                    // Clear stores based on checkbox states
+                    if (intakeChecked) {
+                        await this.clearStore('stateIntake');
+                        window.dispatchEvent(new CustomEvent('stateIntakeUpdated', { 
+                            detail: { action: 'clear' }
+                        }));
+                    }
+
+                    if (ncChecked) {
+                        // Clear all NC stores
+                        await this.clearStore('stateUpdateNC1');
+                        await this.clearStore('stateUpdateNC2');
+                        await this.clearStore('stateUpdateNC3');
+                        
+                        // Dispatch events for each NC store
+                        [1, 2, 3].forEach(ncNum => {
+                            window.dispatchEvent(new CustomEvent('stateUpdateNCUpdated', { 
+                                detail: { 
+                                    nc: ncNum,
+                                    action: 'clear'
+                                }
+                            }));
+                        });
+                    }
+
+                    // Dispatch general store changed event
+                    window.dispatchEvent(new CustomEvent('storeChanged', { 
+                        detail: { store: 'state', action: 'zero' }
+                    }));
+
+                } catch (error) {
+                    console.error('Error zeroing state stores:', error);
+                }
+            });
         }
     }
 }

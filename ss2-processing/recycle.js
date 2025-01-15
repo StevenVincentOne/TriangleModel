@@ -104,31 +104,31 @@ export class RecycleModule {
                 const noiseSymbol = filteredNoise[0];
                 if (noiseSymbol && noiseSymbol.count > 0) {
                     // Add noise symbol back to environmental pool
-                    currentPool.noise.push(noiseSymbol.symbol);
+                currentPool.noise.push(noiseSymbol.symbol);
 
-                    // Update environmental pool
-                    if (envPool[0]) {
-                        await this.environmentDB.updateEnvironmentalPool(currentPool.id, currentPool);
-                    } else {
-                        await this.environmentDB.storeEnvironmentalPool(currentPool);
-                    }
+                // Update environmental pool
+                if (envPool[0]) {
+                    await this.environmentDB.updateEnvironmentalPool(currentPool.id, currentPool);
+                } else {
+                    await this.environmentDB.storeEnvironmentalPool(currentPool);
+                }
 
                     // Remove from filtered noise
-                    await this.environmentDB.deleteFilteredNoise(noiseSymbol.id);
+                await this.environmentDB.deleteFilteredNoise(noiseSymbol.id);
 
-                    console.log('Recycled noise symbol:', {
-                        symbol: noiseSymbol.symbol,
+                console.log('Recycled noise symbol:', {
+                    symbol: noiseSymbol.symbol,
                         count: noiseSymbol.count,
                         envNoiseCount: currentPool.noise.length
-                    });
+                });
 
-                    // Trigger store updates
-                    window.dispatchEvent(new CustomEvent('storeChanged', { 
-                        detail: { 
+                // Trigger store updates
+                window.dispatchEvent(new CustomEvent('storeChanged', { 
+                    detail: { 
                             store: 'environmentalPool',
                             action: 'update'
-                        }
-                    }));
+                    }
+                }));
                 }
 
             } catch (error) {
